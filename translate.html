@@ -1,15 +1,34 @@
-<html>
+<html lang="en">
 <head>
+	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
-	<meta content="utf-8" http-equiv="encoding" />
-	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
-	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
 	<!-- Primary Meta Tags -->
-	<title>CAPTION.Ninja - translate</title>
-	<meta name="title" content="CAPTION.Ninja" />
-	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
+	<title>CAPTION.Ninja - Free Real-Time Translation & Captions</title>
+	<meta name="title" content="CAPTION.Ninja - Free Real-Time Translation & Captions" />
+	<meta name="description" content="Free real-time speech translation for live streams. Translate captions into 17+ languages using local AI (Mozilla Bergamot) or 100+ languages with Google Cloud. Perfect for multilingual broadcasts." />
+	<meta name="keywords" content="translation, real-time translation, live translation, captions, subtitles, multilingual, OBS, streaming, speech to text, Mozilla Bergamot" />
 	<meta name="author" content="Steve Seguin" />
+	<meta name="robots" content="index, follow" />
+	<link rel="canonical" href="https://caption.ninja/translate" />
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://caption.ninja/translate" />
+	<meta property="og:title" content="CAPTION.Ninja - Free Real-Time Translation" />
+	<meta property="og:description" content="Free real-time speech translation for live streams. Translate into 17+ languages locally or 100+ with Google Cloud." />
+	<meta property="og:image" content="https://caption.ninja/favicon.svg" />
+
+	<!-- Twitter -->
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content="CAPTION.Ninja - Free Real-Time Translation" />
+	<meta name="twitter:description" content="Free real-time speech translation for live streams." />
+	<meta name="twitter:creator" content="@steveseguin" />
+
+	<!-- Favicon -->
+	<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+	<link rel="shortcut icon" href="favicon.svg" />
 
 	
 	<style>
@@ -249,6 +268,28 @@
 	  
 	 <button id="toggleTranscription" class="toggle-button">Pause Transcription</button>
 	 <br />
+
+	 <!-- Interim Text Handling Options -->
+	 <div id="interim-options" style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+		<strong style="display: block; margin-bottom: 8px;">Interim Text Handling (for fast speech/talk shows):</strong>
+		<label style="margin-right: 15px;" title="Force finalization after silence (ms). Recommended: 800">
+			Auto-finalize (ms):
+			<input type="number" id="autoFinalInput" min="0" value="0" style="width: 70px;" placeholder="0=off" />
+		</label>
+		<label style="margin-right: 15px;" title="Auto-split on sentence boundaries (. ! ?)">
+			Auto-split sentences
+			<input type="checkbox" id="autoSplitInput" />
+		</label>
+		<label style="margin-right: 15px;" title="Limit interim text to N words (0=unlimited)">
+			Max words:
+			<input type="number" id="maxWordsInput" min="0" value="0" style="width: 60px;" />
+		</label>
+		<label title="Limit interim text to N characters (0=unlimited)">
+			Max chars:
+			<input type="number" id="maxCharsInput" min="0" value="0" style="width: 60px;" />
+		</label>
+	 </div>
+
 	<div id="tts-controls" style="margin-top: 10px;">
 	  <div id="tts-options" style="display: none; margin: 10px 0;">
 		<div class="tts-provider-select" style="margin-bottom: 10px;">
@@ -409,6 +450,8 @@
 	
 	
 <script src="security-utils.js"></script>
+<script src="ws-publisher.js"></script>
+<script src="text-rules.js"></script>
 <script>
 (function (w) {
 	w.URLSearchParams = w.URLSearchParams || function (searchString) {
@@ -427,6 +470,22 @@
 })(window);
 
 var urlParams = new URLSearchParams(window.location.search);
+var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+	? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+	: { replacements: [], restricted: [], matchMode: 'phonetic' };
+var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+	? window.CaptionTextRules.createEngine(textRulesConfig)
+	: null;
+
+function applyTextRules(text) {
+	if (!textRulesEngine || typeof text !== 'string') return text;
+	try {
+		return textRulesEngine.apply(text);
+	} catch (e) {
+		console.warn("Text rules failed:", e);
+		return text;
+	}
+}
 let currentTranslationId = 0;
 let worker;
 let modelRegistry;
@@ -545,48 +604,49 @@ var counter = 0;
 
 worker.onmessage = function(e) {
 	if (e.data[0] === "translate_reply" && e.data[1]) {
-		document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+		const translatedJoined = e.data[1].join("\n\n");
+		document.getElementById("output").innerText = translatedJoined;
 
 		// Get the pending translation info
 		const pendingTranslation = pendingTranslations.get(currentTranslationId);
 		if (pendingTranslation) {
 			if (pendingTranslation.interm || e.data[3]) {
 				if (label) {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"interm": e.data[1].join("\n\n"),
+						"interm": translatedJoined,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				} else {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"interm": e.data[1].join("\n\n"),
+						"interm": translatedJoined,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				}
 			} else {
 				if (label) {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"final": e.data[1].join("\n\n"),
+						"final": translatedJoined,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				} else {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"final": e.data[1].join("\n\n"),
+						"final": translatedJoined,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				}
 
 				// Clean up old pending translations
@@ -830,6 +890,7 @@ function generateStreamID() {
 	}
 	return text;
 };
+
 var roomID = "test";
 if (urlParams.has("room")) {
 	roomID = urlParams.get("room");
@@ -844,67 +905,96 @@ if (urlParams.has("room")) {
 if (isInsecureStreamId(roomID)) {
 	injectSecurityStyles();
 	showSecurityWarning(
-		'Warning: You are using an insecure stream ID that could be easily guessed. Consider using a more secure ID for privacy.',
+		'Warning: You are using an insecure room ID that could be easily guessed. Consider using a more secure ID for privacy.',
 		0 // No auto-dismiss, user must close manually
 	);
 }
 
 var url = document.URL.substr(0, document.URL.lastIndexOf('/'));
-document.getElementById("shareLink").href = url + "/overlay?room=" + roomID;
-document.getElementById("shareLink").innerHTML = url + "/overlay?room=" + roomID;
-navigator.clipboard.writeText(url + "/overlay?room=" + roomID).then(() => {}, () => {});
+const overlayShareLink = url + "/overlay?room=" + encodeURIComponent(roomID);
+document.getElementById("shareLink").href = overlayShareLink;
+document.getElementById("shareLink").textContent = overlayShareLink;
+navigator.clipboard.writeText(overlayShareLink).then(() => {}, () => {});
 
-
-var socket;
-let retryCount = 0;
-const maxRetryDelay = 30000; // Maximum delay of 30 seconds
-const baseDelay = 1000; // Start with 1 second delay after first immediate retry
-
-function getRetryDelay() {
-	if (retryCount === 0) {
-		return 0; // First retry is immediate
-	}
-	// Exponential backoff: baseDelay * 2^(retryCount-1)
-	const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
-	return delay;
+// Interim text handling options
+var autoFinalMs = 0;
+if (urlParams.has("autofinal")){
+	autoFinalMs = parseInt(urlParams.get("autofinal")) || 800;
+} else if (urlParams.has("autofinalize")){
+	autoFinalMs = parseInt(urlParams.get("autofinalize")) || 800;
 }
 
-function connectWebSocket() {
-	if (socket) {
-		socket.close();
-		socket = null;
+var maxWords = 0;
+var maxChars = 0;
+if (urlParams.has("maxwords")){
+	maxWords = parseInt(urlParams.get("maxwords")) || 50;
+}
+if (urlParams.has("maxchars")){
+	maxChars = parseInt(urlParams.get("maxchars")) || 200;
+}
+
+var autoSplit = urlParams.has("autosplit");
+
+var silenceTimer = null;
+var pendingInterim = "";
+
+// Truncate interim text to keep only most recent words/chars
+function truncateInterim(text) {
+	if (!text) return text;
+
+	if (maxChars > 0 && text.length > maxChars) {
+		text = "..." + text.slice(-maxChars);
 	}
 
-	socket = new WebSocket("wss://api.caption.ninja:443");
-
-	socket.onclose = function() {
-		console.log("WebSocket connection closed. Attempting to reconnect...");
-		const delay = getRetryDelay();
-		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-		setTimeout(connectWebSocket, delay);
-		retryCount++;
-	};
-
-	socket.onopen = function() {
-		console.log("WebSocket connected. Joining room...");
-		// Reset retry count on successful connection
-		retryCount = 0;
-		socket.send(JSON.stringify({
-			"join": roomID
-		}));
-	};
-
-	socket.onerror = function(error) {
-		console.error("WebSocket error:", error);
-		if (socket) {
-			socket.close();
-			socket = null;
+	if (maxWords > 0) {
+		const words = text.split(/\s+/);
+		if (words.length > maxWords) {
+			text = "..." + words.slice(-maxWords).join(' ');
 		}
-		const delay = getRetryDelay();
-		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-		setTimeout(connectWebSocket, delay);
-		retryCount++;
+	}
+
+	return text;
+}
+
+// Extract complete sentences for auto-split
+function extractCompleteSentences(text) {
+	const sentenceEndPattern = /([^.!?]*[.!?]+)\s+/g;
+	const matches = [];
+	let lastIndex = 0;
+	let match;
+
+	while ((match = sentenceEndPattern.exec(text)) !== null) {
+		matches.push(match[1].trim());
+		lastIndex = match.index + match[0].length;
+	}
+
+	const remaining = text.slice(lastIndex).trim();
+
+	return {
+		complete: matches,
+		remaining: remaining
 	};
+}
+
+var wsPublisher = null;
+
+function connectWebSocket() {
+	wsPublisher = createWSPublisher({
+		url: "wss://api.caption.ninja:443",
+		room: roomID,
+		onStateChange: function(nextState, snapshot) {
+			if (nextState === "error") {
+				console.error("WebSocket error state:", snapshot && snapshot.lastError);
+			}
+			if (snapshot && snapshot.blockedSuspected) {
+				console.warn("WebSocket may be blocked by VPN/firewall/region filters.");
+			}
+		},
+		onError: function(error) {
+			console.error("WebSocket error:", error);
+		}
+	});
+	wsPublisher.connect();
 }
 
 const ttsMenu = {
@@ -1114,6 +1204,21 @@ const ttsMenu = {
 
 connectWebSocket();
 
+window.copyWsDebugInfo = function () {
+	if (!wsPublisher) return;
+	var snapshot = wsPublisher.getSnapshot();
+	var text = "[Caption.Ninja WS Debug]\\n" +
+		"room=" + roomID + "\\n" +
+		"state=" + snapshot.state + "\\n" +
+		"retries=" + snapshot.retryCount + "\\n" +
+		"queue=" + snapshot.queueLength + "\\n" +
+		"dropped=" + snapshot.droppedCount + "\\n" +
+		"blocked=" + snapshot.blockedSuspected + "\\n" +
+		"lastError=" + (snapshot.lastError || "") + "\\n" +
+		"userAgent=" + navigator.userAgent;
+	navigator.clipboard.writeText(text).catch(function(){});
+};
+
 
 var transcript = '';
 var last_transcription = "";
@@ -1125,9 +1230,9 @@ var ends = 0;
 var sanitize = function(string) {
 	var temp = document.createElement('div');
 	temp.textContent = string;
-	return temp.textContent
+	return applyTextRules(temp.textContent
 		.substring(0, Math.min(temp.textContent.length, 500))
-		.trim();
+		.trim());
 };
 
 function setup() {
@@ -1183,15 +1288,40 @@ function setup() {
 			}
 		};
 
+		// Force finalization of pending interim text
+		function forceFinalization() {
+			if (!pendingInterim) return;
+
+			transcript += (transcript ? ' ' : '') + pendingInterim;
+			document.getElementById("input").value = transcript;
+			console.log("auto-finalized transcript:", transcript);
+
+			// Send for translation
+			if (document.getElementById("fullContext").checked) {
+				translateCall([second_transcription, last_transcription, transcript]
+					.filter(Boolean)
+					.join(' '), false);
+			} else {
+				translateCall(transcript, false);
+			}
+
+			// Update memory
+			second_transcription = last_transcription;
+			last_transcription = transcript + ". ";
+			transcript = "";
+			pendingInterim = "";
+			silenceTimer = null;
+		}
+
 		// Replace the entire recognition.onresult handler with this
 		recognition.onresult = function(event) {
 		  counter += 1;
-		  
+
 		  if (typeof(event.results) == 'undefined') {
 			console.log(event);
 			return;
 		  }
-		  
+
 		  // Auto-dismiss security warning when we get actual speech results
 		  const warningElement = document.getElementById('stream-security-warning');
 		  if (warningElement) {
@@ -1202,7 +1332,7 @@ function setup() {
 		  // Track what's being processed in this batch
 		  let isFinal = false;
 		  let current_batch = '';
-		  
+
 		  // Process only the new results since last event
 		  for (var i = event.resultIndex; i < event.results.length; ++i) {
 			if (event.results[i].isFinal) {
@@ -1212,20 +1342,27 @@ function setup() {
 			  current_batch += ' ' + sanitize(event.results[i][0].transcript);
 			}
 		  }
-		  
+
 		  current_batch = current_batch.trim();
-		  
+
 		  if (!current_batch) {
 			return;
 		  }
-		  
+
 		  // Update the UI to show what's being recognized
 		  if (isFinal) {
+			// Clear silence timer since we got a real final
+			if (silenceTimer) {
+				clearTimeout(silenceTimer);
+				silenceTimer = null;
+			}
+			pendingInterim = "";
+
 			// When we get a final result, add it to transcript
 			transcript += (transcript ? ' ' : '') + current_batch;
 			document.getElementById("input").value = transcript;
 			console.log("final transcript:", transcript);
-			
+
 			// Send final result for translation
 			if (document.getElementById("fullContext").checked) {
 			  translateCall([second_transcription, last_transcription, transcript]
@@ -1240,30 +1377,77 @@ function setup() {
 			last_transcription = transcript + ". ";
 			transcript = "";
 		  } else {
-			// For interim results, combine previous final text with current interim text
-			let display_text = transcript + (transcript ? ' ' : '') + current_batch;
-			document.getElementById("input").value = display_text;
-			
-			// Don't send new interim results if queue is backed up
-			if (translationQueue.length > 3) {
-			  console.log("Skipping interim translation due to backlog");
-			  return;
+			// For interim results
+			let textToProcess = current_batch;
+
+			// Option 4: Auto-split on sentence boundaries
+			if (autoSplit) {
+				const { complete, remaining } = extractCompleteSentences(textToProcess);
+
+				// Process each complete sentence as final
+				for (const sentence of complete) {
+					transcript += (transcript ? ' ' : '') + sentence;
+					document.getElementById("input").value = transcript;
+
+					// Send for translation as final
+					if (document.getElementById("fullContext").checked) {
+						translateCall([second_transcription, last_transcription, transcript]
+							.filter(Boolean)
+							.join(' '), false);
+					} else {
+						translateCall(transcript, false);
+					}
+
+					// Update memory
+					second_transcription = last_transcription;
+					last_transcription = transcript + ". ";
+					transcript = "";
+				}
+
+				textToProcess = remaining;
 			}
-			
-			// For translation: only send what's new if not using context
-			let text_to_translate;
-			if (document.getElementById("fullContext").checked) {
-			  text_to_translate = [second_transcription, last_transcription, display_text]
-				.filter(Boolean)
-				.join(' ');
-			} else {
-			  // Only send the latest segment to avoid duplicates in translation
-			  text_to_translate = display_text;
-			}
-			
-			translateCall(text_to_translate, true);
-		  }
-		};
+
+			// Option 2: Apply word/character truncation
+			textToProcess = truncateInterim(textToProcess);
+
+				if (textToProcess) {
+					// Option 1: Store for auto-finalization and reset timer
+					pendingInterim = textToProcess;
+					if (autoFinalMs > 0) {
+						if (silenceTimer) clearTimeout(silenceTimer);
+					silenceTimer = setTimeout(forceFinalization, autoFinalMs);
+				}
+
+				// Combine previous final text with current interim text
+				let display_text = transcript + (transcript ? ' ' : '') + textToProcess;
+				document.getElementById("input").value = display_text;
+
+				// Don't send new interim results if queue is backed up
+				if (translationQueue.length > 3) {
+					console.log("Skipping interim translation due to backlog");
+					return;
+				}
+
+				// For translation: only send what's new if not using context
+				let text_to_translate;
+				if (document.getElementById("fullContext").checked) {
+					text_to_translate = [second_transcription, last_transcription, display_text]
+						.filter(Boolean)
+						.join(' ');
+				} else {
+					text_to_translate = display_text;
+					}
+
+					translateCall(text_to_translate, true);
+				} else {
+					pendingInterim = "";
+					if (silenceTimer) {
+						clearTimeout(silenceTimer);
+						silenceTimer = null;
+					}
+				}
+			  }
+			};
 		if (isPaused) {
 			return;
 		}
@@ -1280,7 +1464,34 @@ function checkForConflictingSettings() {
 	}
 }
 
-document.addEventListener('DOMContentLoaded', () => ttsMenu.init());
+document.addEventListener('DOMContentLoaded', () => {
+	ttsMenu.init();
+
+	// Initialize interim handling controls from URL params
+	const autoFinalInput = document.getElementById('autoFinalInput');
+	const autoSplitInput = document.getElementById('autoSplitInput');
+	const maxWordsInput = document.getElementById('maxWordsInput');
+	const maxCharsInput = document.getElementById('maxCharsInput');
+
+	if (autoFinalMs > 0) autoFinalInput.value = autoFinalMs;
+	if (autoSplit) autoSplitInput.checked = true;
+	if (maxWords > 0) maxWordsInput.value = maxWords;
+	if (maxChars > 0) maxCharsInput.value = maxChars;
+
+	// Update variables when controls change
+	autoFinalInput.addEventListener('change', function() {
+		autoFinalMs = parseInt(this.value) || 0;
+	});
+	autoSplitInput.addEventListener('change', function() {
+		autoSplit = this.checked;
+	});
+	maxWordsInput.addEventListener('change', function() {
+		maxWords = parseInt(this.value) || 0;
+	});
+	maxCharsInput.addEventListener('change', function() {
+		maxChars = parseInt(this.value) || 0;
+	});
+});
 document.getElementById('fullContext').addEventListener('change', checkForConflictingSettings);
 </script>
 	</body>

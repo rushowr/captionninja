@@ -1,16 +1,65 @@
-<html>
+<html lang="en">
 <head>
+	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
-	<meta content="utf-8" http-equiv="encoding" />
-	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
-	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
 	<!-- Primary Meta Tags -->
-	<title>CAPTION.Ninja</title>
-	<meta name="title" content="CAPTION.Ninja" />
-	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
+	<title>CAPTION.Ninja - Free Live Captions & Translation for OBS, vMix, Streaming</title>
+	<meta name="title" content="CAPTION.Ninja - Free Live Captions & Translation for OBS, vMix, Streaming" />
+	<meta name="description" content="Free browser-based live captioning, transcription, and real-time translation for OBS, vMix, and live streams. No installation required. Speech-to-text powered by browser AI. Created by Steve Seguin, maker of VDO.Ninja." />
+	<meta name="keywords" content="captions, subtitles, OBS, vMix, live streaming, transcription, translation, speech to text, closed captions, accessibility, free, browser, real-time" />
 	<meta name="author" content="Steve Seguin" />
+	<meta name="copyright" content="Steve Seguin" />
+	<meta name="robots" content="index, follow" />
+	<link rel="canonical" href="https://caption.ninja/" />
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://caption.ninja/" />
+	<meta property="og:title" content="CAPTION.Ninja - Free Live Captions & Translation" />
+	<meta property="og:description" content="Free browser-based live captioning and real-time translation for OBS, vMix, and live streams. No installation required." />
+	<meta property="og:image" content="https://caption.ninja/favicon.svg" />
+	<meta property="og:site_name" content="CAPTION.Ninja" />
+
+	<!-- Twitter -->
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:url" content="https://caption.ninja/" />
+	<meta name="twitter:title" content="CAPTION.Ninja - Free Live Captions & Translation" />
+	<meta name="twitter:description" content="Free browser-based live captioning and real-time translation for OBS, vMix, and live streams." />
+	<meta name="twitter:image" content="https://caption.ninja/favicon.svg" />
+	<meta name="twitter:creator" content="@steveseguin" />
+
+	<!-- Favicon -->
+	<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+	<link rel="shortcut icon" href="favicon.svg" />
+
+	<!-- Structured Data -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "WebApplication",
+		"name": "CAPTION.Ninja",
+		"url": "https://caption.ninja",
+		"description": "Free browser-based live captioning, transcription, and real-time translation for OBS, vMix, and live streams.",
+		"applicationCategory": "Multimedia",
+		"operatingSystem": "Any",
+		"offers": {
+			"@type": "Offer",
+			"price": "0",
+			"priceCurrency": "USD"
+		},
+		"author": {
+			"@type": "Person",
+			"name": "Steve Seguin",
+			"url": "https://github.com/steveseguin"
+		},
+		"creator": {
+			"@type": "Person",
+			"name": "Steve Seguin"
+		}
+	}
+	</script>
 	
 	<style>
 		@font-face {
@@ -145,6 +194,64 @@
 		.control-button.paused {
 		  background-color: #dc3545;
 		}
+
+		/* Language toggle control styles */
+		.lang-toggle-container {
+		  position: fixed;
+		  top: 10px;
+		  left: 10px;
+		  z-index: 1000;
+		  display: flex;
+		  align-items: center;
+		  gap: 8px;
+		  background: rgba(0, 0, 0, 0.85);
+		  padding: 8px 12px;
+		  border-radius: 6px;
+		  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		}
+
+		.lang-toggle-container.hidden {
+		  display: none !important;
+		}
+		
+		.lang-toggle-label {
+		  color: #9aa3b2;
+		  font-size: 11px;
+		  text-transform: uppercase;
+		  letter-spacing: 0.5px;
+		}
+		
+		.lang-toggle-btn {
+		  background: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 8px 16px;
+		  border-radius: 4px;
+		  cursor: pointer;
+		  font-weight: 600;
+		  font-size: 14px;
+		  transition: background-color 0.2s, transform 0.1s;
+		  min-width: 60px;
+		  text-align: center;
+		}
+		
+		.lang-toggle-btn:hover {
+		  background: #1d7acc;
+		}
+		
+		.lang-toggle-btn:active {
+		  transform: scale(0.98);
+		}
+		
+		.lang-toggle-btn .lang-code {
+		  font-weight: 700;
+		}
+		
+		.lang-toggle-shortcut {
+		  color: #6b7280;
+		  font-size: 10px;
+		  margin-left: 4px;
+		}
 		
 		.output {
 		  direction: auto;
@@ -225,10 +332,207 @@
 		  .output {
 			font-size: 1.6em;
 		  }
-		  
+
 		  .small-text-container font {
 			font-size: 50% !important;
 		  }
+		}
+
+		/* Customize Overlay Modal */
+		.modal-overlay {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0,0,0,0.7);
+			z-index: 9999;
+			align-items: center;
+			justify-content: center;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+		}
+		.modal-overlay.open {
+			display: flex;
+		}
+		.modal-content {
+			background: #1e2430;
+			border-radius: 12px;
+			padding: 24px;
+			max-width: 640px;
+			width: 90%;
+			max-height: 85vh;
+			overflow-y: auto;
+			color: #e6e9ef;
+			box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+			font-family: inherit;
+		}
+		.modal-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 20px;
+			border-bottom: 1px solid #2d3543;
+			padding-bottom: 12px;
+		}
+		.modal-header h2 {
+			margin: 0;
+			font-size: 1.3em;
+			font-weight: 600;
+		}
+		.modal-close {
+			background: none;
+			border: none;
+			font-size: 24px;
+			color: #9aa3b2;
+			cursor: pointer;
+			font-family: inherit;
+		}
+		.modal-close:hover {
+			color: #fff;
+		}
+		.modal-section {
+			margin-bottom: 24px;
+			padding-bottom: 16px;
+			border-bottom: 1px solid #2d3543;
+		}
+		.modal-section:last-of-type {
+			border-bottom: none;
+		}
+		.modal-section h3 {
+			font-size: 11px;
+			font-weight: 600;
+			color: #7a8599;
+			margin: 0 0 14px 0;
+			text-transform: uppercase;
+			letter-spacing: 0.8px;
+		}
+		.modal-group {
+			margin-bottom: 16px;
+		}
+		.modal-group:last-child {
+			margin-bottom: 0;
+		}
+		.modal-row {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 4px;
+		}
+		.modal-row label {
+			min-width: 150px;
+			font-size: 14px;
+			font-weight: 500;
+		}
+		.modal-row input, .modal-row select {
+			flex: 1;
+			padding: 8px 12px;
+			background: #232a36;
+			border: 1px solid #2d3543;
+			border-radius: 6px;
+			color: #e6e9ef;
+			font-size: 14px;
+			font-family: inherit;
+		}
+		.modal-row input:focus, .modal-row select:focus {
+			outline: none;
+			border-color: var(--primary-color);
+		}
+		.modal-row input[type="checkbox"] {
+			flex: 0;
+			width: 18px;
+			height: 18px;
+			cursor: pointer;
+		}
+		.modal-row input[type="number"] {
+			max-width: 100px;
+		}
+		.modal-help {
+			font-size: 12px;
+			color: #6b7785;
+			margin: 2px 0 0 162px;
+			line-height: 1.4;
+		}
+		.url-preview {
+			background: #0f1017;
+			padding: 12px;
+			border-radius: 6px;
+			font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+			font-size: 11px;
+			word-break: break-all;
+			margin-top: 16px;
+			border: 1px solid #2d3543;
+			max-height: 80px;
+			overflow-y: auto;
+			line-height: 1.5;
+		}
+		.url-preview strong {
+			color: #7a8599;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.capture-note {
+			margin-top: 10px;
+			font-size: 12px;
+			color: #b8c0cc;
+			background: #2d3543;
+			padding: 10px 12px;
+			border-radius: 6px;
+			border-left: 3px solid var(--primary-color);
+		}
+		.capture-note strong {
+			color: #e6e9ef;
+		}
+		.modal-actions {
+			display: flex;
+			gap: 12px;
+			margin-top: 20px;
+		}
+		.modal-actions button {
+			flex: 1;
+			padding: 12px 16px;
+			border-radius: 6px;
+			font-weight: 600;
+			cursor: pointer;
+			border: none;
+			font-size: 14px;
+			font-family: inherit;
+			transition: background-color 0.2s, transform 0.1s;
+		}
+		.modal-actions button:active {
+			transform: scale(0.98);
+		}
+		.modal-actions .copy-btn {
+			background: var(--primary-color);
+			color: white;
+			flex: 2;
+		}
+		.modal-actions .copy-btn:hover {
+			background: #1d7acc;
+		}
+		.modal-actions .cancel-btn {
+			background: #232a36;
+			color: #9aa3b2;
+			border: 1px solid #2d3543;
+		}
+		.modal-actions .cancel-btn:hover {
+			background: #2d3543;
+			color: #e6e9ef;
+		}
+		@media (max-width: 600px) {
+			.modal-content {
+				padding: 16px;
+				max-height: 90vh;
+			}
+			.modal-row {
+				flex-wrap: wrap;
+			}
+			.modal-row label {
+				min-width: 100%;
+				margin-bottom: 4px;
+			}
 		}
 	</style>
 </head>
@@ -237,6 +541,16 @@
 	  <span id="errorMessage"></span>
 	  <button id="dismissError">Dismiss</button>
 	</div>
+
+	<!-- Language Toggle Control (hidden by default, enabled via &togglelang=) -->
+	<div id="langToggleContainer" class="lang-toggle-container hidden">
+	  <span class="lang-toggle-label">Source:</span>
+	  <button id="langToggleBtn" class="lang-toggle-btn" title="Switch source language (Ctrl+L)">
+		<span id="langToggleCurrent" class="lang-code">EN</span>
+	  </button>
+	  <span class="lang-toggle-shortcut">Ctrl+L</span>
+	</div>
+
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
 	
@@ -255,14 +569,23 @@
 		<ul>
 			<li>Use Google Chrome or Microsoft Edge for best results. Some users Chrome has a truncation issue though, so maybe just use Edge.</li>
 			<li>To save the transcription: Select all (CTRL+A), copy (CTRL+C), and paste into a text editor (CTRL+V).</li>
-			<li>Change languages by updating the URL. <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">View language codes here</a></li>
+		</ul>
+
+		<strong>🌐 Translation Options:</strong>
+		<ul>
+			<li><a href='./translation-guide.html'>📖 Complete Translation Guide</a> - All translation methods explained</li>
+			<li><a href='./translate'>Free Translation</a> - 17 languages, no API key required</li>
+			<li><a href='./translate_premium'>Premium Translation</a> - 100+ languages with Google Cloud API</li>
+			<li>Quick overlay translation: Add <code>&translate=es</code> (or other <a href="https://cloud.google.com/translate/docs/languages" target="_blank">language code</a>) to any overlay URL</li>
+			<li>Supported free languages: bg, cs, nl, en, et, de, fr, is, it, nb, nn, fa, pl, pt, ru, es, uk</li>
 		</ul>
 
 		<strong>🔬🛠️ Advanced Features:</strong>
 		<ul>
-			<li>Try our <a href='./translate'>LIVE TRANSLATION version here</a>❗ Free to use, along with Text-to-Speech support 🗣️</li>
+			<li>Change input language: Add <code>&lang=fr-FR</code> to the URL (<a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">speech recognition codes</a>)</li>
+			<li>Multi-language speakers: Add <code>&togglelang=en-US,fr-FR</code> to enable quick language switching (Ctrl+L or click toggle)</li>
+			<li>Text to Speech playback is supported. See the <a href="https://github.com/steveseguin/captionninja?tab=readme-ov-file#tts-integration" target="_blank">TTS guide in the GitHub README</a> and visit <a href="https://tts.rocks" target="_blank">tts.rocks</a> for engines and usage.</li>
 			<li>Use a <a href='https://www.vb-audio.com/Cable/'>Virtual Audio Cable</a> to caption from other audio sources</li>
-			<li>Add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page URL for translation</li>
 		</ul>
 
 		<strong>🆘 Need Help?</strong>
@@ -280,6 +603,9 @@
 	<button id="toggleTranscription" class="hidden control-button">Pause Transcription</button>
 
 	<script src="security-utils.js"></script>
+	<script src="tts-integration.js"></script>
+	<script src="ws-publisher.js"></script>
+	<script src="text-rules.js"></script>
 	<script>
 	
 	function detectTextDirection(text) {
@@ -394,7 +720,22 @@
 		};
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
-	
+	var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+		? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+		: { replacements: [], restricted: [], matchMode: 'phonetic' };
+	var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+		? window.CaptionTextRules.createEngine(textRulesConfig)
+		: null;
+
+	function applyTextRules(text) {
+		if (!textRulesEngine || typeof text !== 'string') return text;
+		try {
+			return textRulesEngine.apply(text);
+		} catch (e) {
+			console.warn('Text rules failed:', e);
+			return text;
+		}
+	}
 	function isEdge() {
 	  return navigator.userAgent.indexOf("Edg/") !== -1;
 	}
@@ -413,9 +754,85 @@
 		}
 		//}
 
+		return applyTextRules(text);
+	}
+
+	function escapeHTML(text) {
+		return String(text)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	// Option 2: Truncate interim text to keep only most recent words/chars
+	function truncateInterim(text) {
+		if (!text) return text;
+
+		// Apply character limit first (keep end)
+		if (maxChars > 0 && text.length > maxChars) {
+			text = "..." + text.slice(-maxChars);
+		}
+
+		// Apply word limit (keep end)
+		if (maxWords > 0) {
+			const words = text.split(/\s+/);
+			if (words.length > maxWords) {
+				text = "..." + words.slice(-maxWords).join(' ');
+			}
+		}
+
 		return text;
 	}
-	
+
+	// Option 4: Extract complete sentences for auto-split
+	function extractCompleteSentences(text) {
+		// Pattern: sentences ending with . ? ! followed by space
+		const sentenceEndPattern = /([^.!?]*[.!?]+)\s+/g;
+		const matches = [];
+		let lastIndex = 0;
+		let match;
+
+		while ((match = sentenceEndPattern.exec(text)) !== null) {
+			matches.push(match[1].trim());
+			lastIndex = match.index + match[0].length;
+		}
+
+		const remaining = text.slice(lastIndex).trim();
+
+		return {
+			complete: matches,      // Array of complete sentences
+			remaining: remaining    // Incomplete sentence at the end
+		};
+	}
+
+	// Option 1: Force finalization of pending interim text
+	function forceFinalization() {
+		if (!pendingInterim) return;
+
+		counter += 1;
+		const direction = detectTextDirection(pendingInterim);
+		document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(pendingInterim)}</span><br />`;
+		document.getElementById("interm").innerHTML = "";
+
+		try {
+			var msgObj = {"msg":true, "final":pendingInterim, "id":counter, "ln": myLang};
+			if (label) msgObj.label = label;
+			publishCaption(msgObj);
+
+			// Optional: speak final results locally if TTS is enabled
+			if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+				window.CAPTION_TTS.speak(pendingInterim);
+			}
+		} catch(e) {
+			console.error(e);
+		}
+
+		pendingInterim = "";
+		silenceTimer = null;
+	}
+
 	var generateRandomString = function (LLL = 16) {
 		var text = "";
 		var words = ["the", "of", "to", "and", "a", "in", "is", "it", "you", "that", "he", "was", "for", "on", "are", "with", "as", "I", "his", "they", "be", "at", "one", "have", "this", "from", "or", "had", "by", "word", "but", "what", "some", "we", "can", "out", "other", "were", "all", "there", "when", "up", "use", "your", "how", "said", "an", "each", "she", "which", "do", "their", "time", "if", "will", "way", "about", "many", "then", "them", "write", "would", "like", "so", "these", "her", "long", "make", "thing", "see", "him", "two", "has", "look", "more", "day", "could", "go", "come", "did", "number", "sound", "no", "most", "people", "my", "over", "know", "water", "than", "call", "first", "who", "may", "down", "side", "been", "now", "find", "any", "new", "work", "part", "take", "get", "place", "made", "live", "where", "after", "back", "little", "only", "round", "man", "year", "came", "show", "every", "good", "me", "give", "our", "under", "name", "very", "through", "just", "form", "sentence", "great", "think", "say", "help", "low", "line", "differ", "turn", "cause", "much", "mean", "before", "move", "right", "boy", "old", "too", "same", "tell", "does", "set", "three", "want", "air", "well", "also", "play", "small", "end", "put", "home", "read", "hand", "port", "large", "spell", "add", "even", "land", "here", "must", "big", "high", "such", "follow", "act", "why", "ask", "men", "change", "went", "light", "kind", "off", "need", "house", "picture", "try", "us", "again", "animal", "point", "mother", "world", "near", "build", "self", "earth", "father", "head", "stand", "own", "page", "should", "country", "found", "answer", "school", "grow", "study", "still", "learn", "plant", "cover", "food", "sun", "four", "between", "state", "keep", "eye", "never", "last", "let", "thought", "city", "tree", "cross", "farm", "hard", "start", "might", "story", "saw", "far", "sea", "draw", "left", "late", "run", "dont", "while", "press", "close", "night", "real", "life", "few", "north", "open", "seem", "together", "next", "white", "children", "begin", "got", "walk", "example", "ease", "paper", "group", "always", "music", "those", "both", "mark", "often", "letter", "until", "mile", "river", "car", "feet", "care", "second", "book", "carry", "took", "science", "eat", "room", "friend", "began", "idea", "fish", "mountain", "stop", "once", "base", "hear", "horse", "cut", "sure", "watch", "color", "face", "wood", "main", "enough", "plain", "girl", "usual", "young", "ready", "above", "ever", "red", "list", "though", "feel", "talk", "bird", "soon", "body", "dog", "family", "direct", "pose", "leave", "song", "measure", "door", "product", "black", "short", "numeral", "class", "wind", "question", "happen", "complete", "ship", "area", "half", "rock", "order", "fire", "south", "problem", "piece", "told", "knew", "pass", "since", "top", "whole", "king", "space", "heard", "best", "hour", "better", "during", "hundred", "five", "remember", "step", "early", "hold", "west", "ground", "interest", "reach", "fast", "verb", "sing", "listen", "six", "table", "travel", "less", "morning", "ten", "simple", "several", "vowel", "toward", "war", "lay", "against", "pattern", "slow", "center", "love", "person", "money", "serve", "appear", "road", "map", "rain", "rule", "govern", "pull", "cold", "notice", "voice", "unit", "power", "town", "fine", "certain", "fly", "fall", "lead", "cry", "dark", "machine", "note", "wait", "plan", "figure", "star", "box", "noun", "field", "rest", "correct", "able", "pound", "done", "beauty", "drive", "stood", "contain", "front", "teach", "week", "final", "gave", "green", "oh", "quick", "develop", "ocean", "warm", "free", "minute", "strong", "special", "mind", "behind", "clear", "tail", "produce", "fact", "street", "inch", "multiply", "nothing", "course", "stay", "wheel", "full", "force", "blue", "object", "decide", "surface", "deep", "moon", "island", "foot", "system", "busy", "test", "record", "boat", "common", "gold", "possible", "plane", "stead", "dry", "wonder", "laugh", "thousand", "ago", "ran", "check", "game", "shape", "equate", "hot", "miss", "brought", "heat", "snow", "tire", "bring", "yes", "distant", "fill", "east", "paint", "language", "among", "grand", "ball", "yet", "wave", "drop", "heart", "am", "present", "heavy", "dance", "engine", "position", "arm", "wide", "sail", "material", "size", "vary", "settle", "speak", "weight", "general", "ice", "matter", "circle", "pair", "include", "divide", "syllable", "felt", "perhaps", "pick", "sudden", "count", "square", "reason", "length", "represent", "art", "subject", "region", "energy", "hunt", "probable", "bed", "brother", "egg", "ride", "cell", "believe", "fraction", "forest", "sit", "race", "window", "store", "summer", "train", "sleep", "prove", "lone", "leg", "exercise", "wall", "catch", "mount", "wish", "sky", "board", "joy", "winter", "sat", "written", "wild", "instrument", "kept", "glass", "grass", "cow", "job", "edge", "sign", "visit", "past", "soft", "fun", "bright", "gas", "weather", "month", "million", "bear", "finish", "happy", "hope", "flower", "clothe", "strange", "gone", "jump", "baby", "eight", "village", "meet", "root", "buy", "raise", "solve", "metal", "whether", "push", "seven", "paragraph", "third", "shall", "held", "hair", "describe", "cook", "floor", "either", "result", "burn", "hill", "safe", "cat", "century", "consider", "type", "law", "bit", "coast", "copy", "phrase", "silent", "tall", "sand", "soil", "roll", "temperature", "finger", "industry", "value", "fight", "lie", "beat", "excite", "natural", "view", "sense", "ear", "else", "quite", "broke", "case", "middle", "kill", "son", "lake", "moment", "scale", "loud", "spring", "observe", "child", "straight", "consonant", "nation", "dictionary", "milk", "speed", "method", "organ", "pay", "age", "section", "dress", "cloud", "surprise", "quiet", "stone", "tiny", "climb", "cool", "design", "poor", "lot", "experiment", "bottom", "key", "iron", "single", "stick", "flat", "twenty", "skin", "smile", "crease", "hole", "trade", "melody", "trip", "office", "receive", "row", "mouth", "exact", "symbol", "die", "least", "trouble", "shout", "except", "wrote", "seed", "tone", "join", "suggest", "clean", "break", "lady", "yard", "rise", "bad", "blow", "oil", "blood", "touch", "grew", "cent", "mix", "team", "wire", "cost", "lost", "brown", "wear", "garden", "equal", "sent", "choose", "fell", "fit", "flow", "fair", "bank", "collect", "save", "control", "decimal", "gentle", "woman", "captain", "practice", "separate", "difficult", "doctor", "please", "protect", "noon", "whose", "locate", "ring", "character", "insect", "caught", "period", "indicate", "radio", "spoke", "atom", "human", "history", "effect", "electric", "expect", "crop", "modern", "element", "hit", "student", "corner", "party", "supply", "bone", "rail", "imagine", "provide", "agree", "thus", "capital", "wont", "chair", "danger", "fruit", "rich", "thick", "soldier", "process", "operate", "guess", "necessary", "sharp", "wing", "create", "neighbor", "wash", "bat", "rather", "crowd", "corn", "compare", "poem", "string", "bell", "depend", "meat", "rub", "tube", "famous", "dollar", "stream", "fear", "sight", "thin", "triangle", "planet", "hurry", "chief", "colony", "clock", "mine", "tie", "enter", "major", "fresh", "search", "send", "yellow", "gun", "allow", "print", "dead", "spot", "desert", "suit", "current", "lift", "rose", "continue", "block", "chart", "hat", "sell", "success", "company", "subtract", "event", "particular", "deal", "swim", "term", "opposite", "wife", "shoe", "shoulder", "spread", "arrange", "camp", "invent", "cotton", "born", "determine", "quart", "nine", "truck", "noise", "level", "chance", "gather", "shop", "stretch", "throw", "shine", "property", "column", "molecule", "select", "wrong", "gray", "repeat", "require", "broad", "prepare", "salt", "nose", "plural", "anger", "claim", "continent", "oxygen", "sugar", "death", "pretty", "skill", "women", "season", "solution", "magnet", "silver", "thank", "branch", "match", "suffix", "especially", "fig", "afraid", "huge", "sister", "steel", "discuss", "forward", "similar", "guide", "experience", "score", "apple", "bought", "led", "pitch", "coat", "mass", "card", "band", "rope", "slip", "win", "dream", "evening", "condition", "feed", "tool", "total", "basic", "smell", "valley", "nor", "double", "seat", "arrive", "master", "track", "parent", "shore", "division", "sheet", "substance", "favor", "connect", "post", "spend", "chord", "fat", "glad", "original", "share", "station", "dad", "bread", "charge", "proper", "bar", "offer", "segment", "slave", "duck", "instant", "market", "degree", "populate", "chick", "dear", "enemy", "reply", "drink", "occur", "support", "speech", "nature", "range", "steam", "motion", "path", "liquid", "log", "meant", "quotient", "teeth", "shell", "neck"];
@@ -442,6 +859,25 @@
 
 		return text;
 	};
+
+	// Secure alphanumeric room ID generator (>=12 chars)
+	function generateSecureRoomID(len = 16) {
+		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+		let out = '';
+		const cryptoObj = window.crypto || window.msCrypto;
+		if (cryptoObj && typeof cryptoObj.getRandomValues === "function") {
+			const randomValues = new Uint8Array(len);
+			cryptoObj.getRandomValues(randomValues);
+			for (let i = 0; i < len; i++) {
+				out += chars.charAt(randomValues[i] % chars.length);
+			}
+			return out;
+		}
+		for (let i = 0; i < len; i++) {
+			out += chars.charAt(Math.floor(Math.random() * chars.length));
+		}
+		return out;
+	}
 	
 	function generateStreamID(){
 		var text = "";
@@ -452,20 +888,26 @@
 		return text;
 	};
 	var roomID = "test";
+	let storedRoom = "";
+	try { storedRoom = localStorage.getItem('cn_room_id') || ""; } catch (e) {}
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
 	} else if (urlParams.has("ROOM")){
 		roomID = urlParams.get("ROOM");
+	} else if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) {
+		roomID = storedRoom;
+		updateURL("room="+roomID);
 	} else {
-		roomID = generateRandomString();
+		roomID = generateSecureRoomID(16);
 		updateURL("room="+roomID);
 	}
+	try { localStorage.setItem('cn_room_id', roomID); } catch (e) {}
 	
 	// Check for insecure stream ID and show warning
 	if (isInsecureStreamId(roomID)) {
 		injectSecurityStyles();
 		showSecurityWarning(
-			'Warning: You are using an insecure stream ID that could be easily guessed. Consider using a more secure ID for privacy.',
+			'Warning: You are using an insecure room ID that could be easily guessed. Consider using a more secure ID for privacy.',
 			0 // No auto-dismiss, user must close manually
 		);
 	}
@@ -481,11 +923,147 @@
 		updateURL("lang="+myLang);
 	}
 	console.log("Language: "+myLang);
-	var srtFile = "";
-	var timestamp_start = null
-	var timestamp_stop = null
-	var timestamp_intern  = null;
-	var logcounter=0;
+
+	// Language Toggle Feature - enables quick switching between languages
+	// Usage: &togglelang=en-US,fr-FR or &togglelang=en-US,fr-FR,es-ES
+	var toggleLanguages = [];
+	var currentLangIndex = 0;
+	
+	if (urlParams.has("togglelang")) {
+		var toggleParam = urlParams.get("togglelang");
+		toggleLanguages = toggleParam.split(",").map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+		
+		if (toggleLanguages.length >= 2) {
+			// Find current language in the toggle list, or default to first
+			currentLangIndex = toggleLanguages.indexOf(myLang);
+			if (currentLangIndex === -1) {
+				// Current lang not in list, set to first toggle language
+				currentLangIndex = 0;
+				myLang = toggleLanguages[0];
+				updateURL("lang=" + myLang, true);
+			}
+			
+			// Show the toggle UI
+			var langToggleContainer = document.getElementById("langToggleContainer");
+			var langToggleBtn = document.getElementById("langToggleBtn");
+			var langToggleCurrent = document.getElementById("langToggleCurrent");
+			
+			if (langToggleContainer && langToggleBtn && langToggleCurrent) {
+				langToggleContainer.classList.remove("hidden");
+				
+				// Display language code (e.g., "EN" from "en-US")
+				function updateToggleDisplay() {
+					var displayCode = myLang.split("-")[0].toUpperCase();
+					langToggleCurrent.textContent = displayCode;
+					langToggleBtn.title = "Current: " + myLang + " - Click or Ctrl+L to switch";
+				}
+				updateToggleDisplay();
+				
+				// Switch to next language in the list
+				function switchLanguage() {
+					currentLangIndex = (currentLangIndex + 1) % toggleLanguages.length;
+					myLang = toggleLanguages[currentLangIndex];
+					updateURL("lang=" + myLang, true);
+					updateToggleDisplay();
+					console.log("Switched language to: " + myLang);
+					
+					// Restart speech recognition with new language
+					if (recognition) {
+						recognition.lang = myLang;
+						// Stop and restart to apply new language
+						try {
+							recognition.stop();
+						} catch(e) {
+							console.log("Recognition stop error (expected):", e);
+						}
+						// Recognition will auto-restart via onend handler
+					}
+				}
+				
+				// Click handler
+				langToggleBtn.addEventListener("click", switchLanguage);
+				
+				// Keyboard shortcut: Ctrl+L
+				document.addEventListener("keydown", function(e) {
+					if (e.ctrlKey && e.key.toLowerCase() === "l") {
+						e.preventDefault();
+						switchLanguage();
+					}
+				});
+			}
+		}
+	}
+
+// Option 1: Silence-based auto-finalization (ms, 0=disabled)
+var autoFinalMs = 0;
+if (urlParams.has("autofinal")){
+	autoFinalMs = parseInt(urlParams.get("autofinal")) || 800;
+} else if (urlParams.has("autofinalize")){
+	autoFinalMs = parseInt(urlParams.get("autofinalize")) || 800;
+}
+
+// Option 2: Word/character limits for interim text (0=disabled)
+var maxWords = 0;
+var maxChars = 0;
+if (urlParams.has("maxwords")){
+	maxWords = parseInt(urlParams.get("maxwords")) || 50;
+}
+if (urlParams.has("maxchars")){
+	maxChars = parseInt(urlParams.get("maxchars")) || 200;
+}
+
+// Option 4: Auto-split on sentence boundaries
+var autoSplit = urlParams.has("autosplit");
+
+var srtFile = "";
+var timestamp_start = null
+var timestamp_stop = null
+var timestamp_intern  = null;
+var logcounter=0;
+// Track previous cue's end time in ms (relative to session start)
+var lastStopMs = 0;
+// Maintain structured cues so we can post-trim to avoid overlaps
+var srtCues = []; // {startMs, endMs, text}
+// minimum duration for a cue (override with &minCueMs=###)
+var MIN_CUE_MS = (function() {
+  var val = urlParams && urlParams.get && urlParams.get('minCueMs');
+  var n = parseInt(val, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+})();
+
+function formatSrtTime(ms) {
+  var t = Math.max(0, Math.floor(ms));
+  var hh = Math.floor(t / 3600000); t -= hh * 3600000;
+  var mm = Math.floor(t / 60000);   t -= mm * 60000;
+  var ss = Math.floor(t / 1000);    t -= ss * 1000;
+  var ms3 = t;
+  function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
+  return pad(hh,2) + ':' + pad(mm,2) + ':' + pad(ss,2) + ',' + pad(ms3,3);
+}
+
+function rebuildSrtFile() {
+  var out = "";
+  // Create a shallow copy to adjust on render, ensuring non-overlap & min durations
+  for (var i = 0; i < srtCues.length; i++) {
+    var c = srtCues[i];
+    var start = Math.max(0, c.startMs|0);
+    var end = Math.max(start, c.endMs|0);
+    var nextStart = (i+1 < srtCues.length) ? Math.max(0, srtCues[i+1].startMs|0) : null;
+
+    // Enforce minimum duration when possible
+    var desiredEnd = Math.max(end, start + MIN_CUE_MS);
+    if (nextStart !== null && desiredEnd > nextStart) {
+      end = nextStart; // don't overlap next
+    } else {
+      end = desiredEnd;
+    }
+
+    out += (i+1) + "\n";
+    out += formatSrtTime(start) + " --> " + formatSrtTime(end) + "\n";
+    out += ">> " + c.text + "\n\n";
+  }
+  srtFile = out;
+}
 	var counter=0;
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
 	var oldSaves = Object.keys(localStorage);
@@ -510,64 +1088,54 @@
 			}
 		}
 	}
-	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
-	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
-	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-    }, () => {
-    });
+	const overlayShareLink = url+"/overlay?room="+encodeURIComponent(roomID);
+	document.getElementById("shareLink").href = overlayShareLink;
+	document.getElementById("shareLink").textContent = overlayShareLink;
+	navigator.clipboard.writeText(overlayShareLink).then(() => {
+	}, () => {
+	});
 	var apiKey = false;
-	
-	var socket;
-	let retryCount = 0;
-	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
-	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
-
-	function getRetryDelay() {
-		if (retryCount === 0) {
-			return 0; // First retry is immediate
-		}
-		// Exponential backoff: baseDelay * 2^(retryCount-1)
-		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
-		return delay;
+	var wsPublisher = null;
+	function publishCaption(payload) {
+		if (!wsPublisher || !payload) return;
+		wsPublisher.publish(payload);
 	}
 
 	function connectWebSocket() {
-		if (socket) {
-			socket.close();
-			socket = null;
-		}
-
-		socket = new WebSocket("wss://api.caption.ninja:443");
-
-		socket.onclose = function() {
-			console.log("WebSocket connection closed. Attempting to reconnect...");
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
-
-		socket.onopen = function() {
-			console.log("WebSocket connected. Joining room...");
-			// Reset retry count on successful connection
-			retryCount = 0;
-			socket.send(JSON.stringify({"join":roomID}));
-		};
-
-		socket.onerror = function(error) {
-			console.error("WebSocket error:", error);
-			if (socket) {
-				socket.close();
-				socket = null;
+		wsPublisher = createWSPublisher({
+			url: "wss://api.caption.ninja:443",
+			room: roomID,
+			onStateChange: function(nextState, snapshot) {
+				if (nextState === "error") {
+					console.error("WebSocket error state:", snapshot && snapshot.lastError);
+				}
+				if (snapshot && snapshot.blockedSuspected) {
+					showErrorBanner("WebSocket may be blocked by network/firewall/VPN. Try disabling VPN or checking browser console.");
+				}
+			},
+			onError: function(error) {
+				console.error("WebSocket error:", error);
 			}
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
+		});
+		wsPublisher.connect();
 	}
 
 	connectWebSocket();
+
+	window.copyWsDebugInfo = function () {
+		if (!wsPublisher) return;
+		var snapshot = wsPublisher.getSnapshot();
+		var text = "[Caption.Ninja WS Debug]\\n" +
+			"room=" + roomID + "\\n" +
+			"state=" + snapshot.state + "\\n" +
+			"retries=" + snapshot.retryCount + "\\n" +
+			"queue=" + snapshot.queueLength + "\\n" +
+			"dropped=" + snapshot.droppedCount + "\\n" +
+			"blocked=" + snapshot.blockedSuspected + "\\n" +
+			"lastError=" + (snapshot.lastError || "") + "\\n" +
+			"userAgent=" + navigator.userAgent;
+		navigator.clipboard.writeText(text).catch(function(){});
+	};
 	
 	
 	function handleNetworkError() {
@@ -603,6 +1171,8 @@
 	var interim_transcript = "";
 	var recognition = null;
 	var idle = null;
+	var silenceTimer = null;      // Option 1: timer for auto-finalization
+	var pendingInterim = "";      // Option 1: current interim text to finalize
 	setup();
 	var startd = false;
 	function setup() {
@@ -638,19 +1208,19 @@
 		  console.log(e);
 		  console.log("Stopped transcription");
 		  
-		  if (startd) {
-			let currentInterim = document.getElementById("interm").innerText.trim();
-			if (currentInterim) {
-			  counter += 1;
-			  const direction = detectTextDirection(currentInterim);
-			  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${currentInterim}</span><br />`;
-			  document.getElementById("interm").innerHTML = "";
+			  if (startd) {
+				let currentInterim = document.getElementById("interm").innerText.trim();
+				if (currentInterim) {
+				  counter += 1;
+				  const direction = detectTextDirection(currentInterim);
+				  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(currentInterim)}</span><br />`;
+				  document.getElementById("interm").innerHTML = "";
 			  
 			  try {
 				if (label) {
-				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "label":label, "ln": myLang}));
+				  publishCaption({"msg":true, "final":currentInterim, "id":counter, "label":label, "ln": myLang});
 				} else {
-				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "ln": myLang}));
+				  publishCaption({"msg":true, "final":currentInterim, "id":counter, "ln": myLang});
 				}
 			  } catch(e) {
 				console.error(e);
@@ -686,15 +1256,25 @@
 		    const direction = detectTextDirection(transcript);
 		    
 		    if(event.results[i].isFinal) {
-		      new_final_transcript += ' ' + transcript;
-		      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
-		      document.getElementById("interm").innerHTML = "";
-		      
-		      try {
-		        if (label) {
-		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
-		        } else {
-		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
+		      // Clear silence timer since we got a real final
+		      if (silenceTimer) {
+		        clearTimeout(silenceTimer);
+		        silenceTimer = null;
+		      }
+				      pendingInterim = "";
+
+				      new_final_transcript += ' ' + transcript;
+				      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(transcript)}</span><br />`;
+				      document.getElementById("interm").innerHTML = "";
+			      try {
+			        if (label) {
+			          publishCaption({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang});
+			        } else {
+		          publishCaption({"msg":true, "final":transcript, "id":counter, "ln": myLang});
+		        }
+		        // Optional: speak final results locally if TTS is enabled
+		        if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+		          window.CAPTION_TTS.speak(transcript);
 		        }
 		      } catch(e) {
 		        console.error(e);
@@ -706,62 +1286,138 @@
 		    }
 		  }
 		  
-		  if (interim_transcript.trim()) {
-		    const direction = detectTextDirection(interim_transcript);
-		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript.trim()}</span><br />`;
-		    
-		    try {
-		      if (label) {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "label":label, "ln": myLang}));
-		      } else {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "ln": myLang}));
-		      }
-		    } catch(e) {
-		      console.error(e);
-		    }
-		  }
+  if (interim_transcript.trim()) {
+    // Mark the start of this segment on first interim token
+    if (timestamp_intern === null) { timestamp_intern = Date.now(); }
+
+    let textToProcess = interim_transcript.trim();
+
+    // Option 4: Auto-split on sentence boundaries
+    if (autoSplit) {
+      const { complete, remaining } = extractCompleteSentences(textToProcess);
+
+      // Send each complete sentence as final
+		      for (const sentence of complete) {
+		        counter += 1;
+		        const dir = detectTextDirection(sentence);
+		        document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${dir}'>${escapeHTML(sentence)}</span><br />`;
+	        try {
+	          var msgObj = {"msg":true, "final": sentence, "id":counter, "ln": myLang};
+	          if (label) msgObj.label = label;
+	          publishCaption(msgObj);
+        } catch(e) {
+          console.error(e);
+        }
+      }
+
+      // Only keep remaining incomplete text as interim
+      textToProcess = remaining;
+    }
+
+    // Option 2: Apply word/character truncation
+    textToProcess = truncateInterim(textToProcess);
+
+	    if (textToProcess) {
+	      // Option 1: Store for potential auto-finalization and reset timer
+	      pendingInterim = textToProcess;
+	      if (autoFinalMs > 0) {
+	        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(forceFinalization, autoFinalMs);
+      }
+
+	      const direction = detectTextDirection(textToProcess);
+	      document.getElementById("interm").innerHTML = `<span dir='${direction}'>${escapeHTML(textToProcess)}</span><br />`;
+
+      try {
+        var msgObj = {"msg":true, "interm":textToProcess, "id":counter, "ln": myLang};
+        if (label) msgObj.label = label;
+        publishCaption(msgObj);
+
+        // Optional: streaming TTS for interim when explicitly requested
+        if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
+          window.CAPTION_TTS.speak(textToProcess, true);
+        }
+	      } catch(e) {
+	        console.error(e);
+	      }
+	    } else {
+	      document.getElementById("interm").innerHTML = "";
+	      pendingInterim = "";
+	      if (silenceTimer) {
+	        clearTimeout(silenceTimer);
+	        silenceTimer = null;
+	      }
+	    }
+	  }
 		  
 		  final_transcript = new_final_transcript.trim();
 		  
-		  if (final_transcript && timestamp_start === null) {
-		    timestamp_start = Date.now();
-		    timestamp_intern = Date.now();
-		  } else if (interim_transcript.trim() && timestamp_start === null) {
-		    timestamp_start = Date.now();
-		    timestamp_intern = Date.now();
-		  }
+      // Initialize session start once; do not set per-cue start here
+      if (timestamp_start === null) {
+        timestamp_start = Date.now();
+      }
 		  
 		  if (final_transcript) {
 		    console.log("FINAL:", final_transcript);
 		    startd = true;
 		    try {
-		      timestamp_stop = Date.now();
-		      timestamp_stop = Date.now() - timestamp_start;
-		      var date = new Date(0);
-		      date.setSeconds(timestamp_stop/1000);
-		      timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
-		      timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
-		      timestamp_intern -= timestamp_start;
-		      var date = new Date(0);
-		      date.setSeconds(timestamp_intern/1000);
-		      timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
-		      timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
-		      
-		      logcounter += 1;
-		      srtFile += logcounter + "\n";
-		      srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
-		      timestamp_intern = null;
-		      srtFile += ">> " + final_transcript + "\n\n";
+      // Compute start and end times for this cue
+      // End time is now relative to session start
+      var endMs = Date.now() - timestamp_start;
+      // Start time is when the first interim of this segment arrived; if we didn't
+      // get any interim (edge case), fall back to previous cue's end
+      var startMs;
+      if (timestamp_intern === null) {
+        // Prefer last cue's end if we have trimmed it; fallback to lastStopMs
+        if (srtCues.length > 0) {
+          startMs = srtCues[srtCues.length - 1].endMs;
+        } else {
+          startMs = lastStopMs;
+        }
+      } else {
+        startMs = timestamp_intern - timestamp_start;
+      }
+
+      // Enforce minimum cue duration unless it would overlap the next cue
+      if ((endMs - startMs) < MIN_CUE_MS) {
+        endMs = startMs + MIN_CUE_MS;
+      }
+
+      // If this cue starts before/at the previous cue's end, trim the previous cue
+      // and try to keep at least MIN_CUE_MS when there is room.
+      if (srtCues.length > 0) {
+        var prev = srtCues[srtCues.length - 1];
+        var maxEndAllowed = startMs; // cannot exceed new cue's start
+        var minEndDesired = prev.startMs + MIN_CUE_MS; // prefer this if space allows
+        // First, ensure previous meets minimum if possible; then clamp to avoid overlap
+        prev.endMs = Math.min(maxEndAllowed, Math.max(prev.endMs, minEndDesired));
+        // Never allow end before start (can happen if maxEndAllowed < start+min)
+        if (prev.endMs < prev.startMs) prev.endMs = prev.startMs;
+      }
+
+      // Add this cue
+      srtCues.push({ startMs: startMs, endMs: endMs, text: final_transcript });
+      rebuildSrtFile();
+
+      // Prepare for the next segment
+      lastStopMs = endMs;
+      timestamp_intern = null;
 		      setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
+		      // Speak any aggregated final text that was appended on end
+		      if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+		        window.CAPTION_TTS.speak(final_transcript);
+		      }
 		      
-		      if (logcounter === 1) {
-		        // UI setup code remains unchanged
-		        var button = document.createElement("button");
-		        button.onclick = function() {
-		          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
-		        };
-		        button.innerHTML = "Download transcription";
-		        button.className = "control-button";
+      if (srtCues.length === 1) {
+        // UI setup code remains unchanged
+        var button = document.createElement("button");
+        button.onclick = function() {
+          // Rebuild just before download to guarantee latest min/trim rules
+          try { rebuildSrtFile(); } catch (e) { console.warn(e); }
+          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
+        };
+        button.innerHTML = "Download transcription";
+        button.className = "control-button";
 		
 		        var shareButton = document.createElement("button");
 		        shareButton.onclick = function() {
@@ -780,8 +1436,17 @@
 		          controlContainer.className = "control-buttons";
 		          document.body.appendChild(controlContainer);
 		        }
+		        // Customize Overlay button
+		        var customizeButton = document.createElement("button");
+		        customizeButton.onclick = function() {
+		          openCustomizeModal();
+		        };
+		        customizeButton.innerHTML = "Customize Overlay";
+		        customizeButton.className = "control-button";
+
 		        controlContainer.appendChild(button);
 		        controlContainer.appendChild(shareButton);
+		        controlContainer.appendChild(customizeButton);
 		        toggleButton.classList.remove("hidden");
 		        document.querySelector('.control-buttons').appendChild(toggleButton);
 		      }
@@ -796,11 +1461,22 @@
 		}
 	  }
 	}
+
+	// Optional: open a separate TTS window powered by tts.rocks bridge
+	try {
+	  if (urlParams.has('ttspopout')) {
+	    var qs = new URLSearchParams(window.location.search);
+	    // Ensure room param is present
+	    qs.set('room', roomID);
+	    var bridgeUrl = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '') + '/tts.rocks/caption-bridge.html?' + qs.toString();
+	    window.open(bridgeUrl, '_blank', 'noopener');
+	  }
+	} catch (e) { console.warn(e); }
 			
 	if (urlParams.has("test")){
 		setInterval(function(){
 			counter += 1;
-			socket.send(JSON.stringify({"msg":true, "final":counter, "id":counter}));
+			publishCaption({"msg":true, "final":counter, "id":counter});
 		},500);
 	}
 	
@@ -813,6 +1489,355 @@
 	});
 	
 	</script>
-	
+
+	<!-- Customize Overlay Modal -->
+	<div id="customizeModal" class="modal-overlay">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h2>Customize Overlay</h2>
+				<button class="modal-close" onclick="closeCustomizeModal()">&times;</button>
+			</div>
+			<p style="margin: 0 0 20px 0; color: #7a8599; font-size: 13px; line-height: 1.5;">
+				Configure how captions appear in OBS/vMix. The URL below updates as you change settings.
+			</p>
+
+				<div class="modal-section">
+					<h3>Translation</h3>
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Translate to:</label>
+						<select id="modalTranslate">
+							<option value="">None (disabled)</option>
+							<option value="bg">Bulgarian</option>
+							<option value="cs">Czech</option>
+							<option value="nl">Dutch</option>
+							<option value="en">English</option>
+							<option value="et">Estonian</option>
+							<option value="de">German</option>
+							<option value="fr">French</option>
+							<option value="is">Icelandic</option>
+							<option value="it">Italian</option>
+							<option value="nb">Norwegian Bokmal</option>
+							<option value="nn">Norwegian Nynorsk</option>
+							<option value="fa">Persian</option>
+							<option value="pl">Polish</option>
+							<option value="pt">Portuguese</option>
+							<option value="ru">Russian</option>
+							<option value="es">Spanish</option>
+							<option value="uk">Ukrainian</option>
+						</select>
+						</div>
+						<div class="modal-help">Free local translation via Mozilla Bergamot (17 languages)</div>
+					</div>
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Provider:</label>
+							<select id="modalTranslateProvider">
+								<option value="auto">Auto (recommended)</option>
+								<option value="local">Local (Bergamot)</option>
+								<option value="google">Google Cloud</option>
+								<option value="openai">OpenAI-compatible</option>
+								<option value="anthropic">Anthropic</option>
+								<option value="ollama">Ollama</option>
+							</select>
+						</div>
+						<div class="modal-help">Choose translation backend. Auto keeps existing behavior.</div>
+					</div>
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Dual overlay:</label>
+							<input type="checkbox" id="modalDual" />
+						</div>
+						<div class="modal-help">Show both original text and translation together</div>
+					</div>
+					<div class="modal-group" id="modalProviderKeyGroup">
+						<div class="modal-row">
+							<label id="modalProviderKeyLabel">Google API Key:</label>
+							<input type="text" id="modalGoogleKey" placeholder="Optional" />
+						</div>
+						<div class="modal-help" id="modalProviderKeyHelp">For 100+ languages via Google Cloud Translation (paid)</div>
+					</div>
+					<div class="modal-group" id="modalProviderUrlGroup" style="display:none;">
+						<div class="modal-row">
+							<label id="modalProviderUrlLabel">Endpoint URL:</label>
+							<input type="text" id="modalProviderUrl" placeholder="Optional custom API base URL" />
+						</div>
+						<div class="modal-help">Use for self-hosted/proxy translation endpoints.</div>
+					</div>
+					<div class="modal-group" id="modalProviderModelGroup" style="display:none;">
+						<div class="modal-row">
+							<label id="modalProviderModelLabel">Model:</label>
+							<input type="text" id="modalProviderModel" placeholder="Optional model id" />
+						</div>
+						<div class="modal-help">Optional model override for remote providers.</div>
+					</div>
+				</div>
+
+			<div class="modal-section">
+				<h3>Display Options</h3>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Max lines:</label>
+						<input type="number" id="modalMaxlines" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Keep only the last N lines on screen (0 = unlimited)</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-hide after (ms):</label>
+						<input type="number" id="modalShowtime" min="0" value="5000" />
+					</div>
+					<div class="modal-help">Clear overlay after this many milliseconds of inactivity</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Clear each message:</label>
+						<input type="checkbox" id="modalClear" />
+					</div>
+					<div class="modal-help">Show only the latest line (clears previous text)</div>
+				</div>
+			</div>
+
+			<div class="modal-section">
+				<h3>Fast Speech / Talk Shows</h3>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-finalize (ms):</label>
+						<input type="number" id="modalAutofinal" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Force text to finalize after silence. Try 800ms for fast speech.</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-split sentences:</label>
+						<input type="checkbox" id="modalAutosplit" />
+					</div>
+					<div class="modal-help">Break text into lines at sentence boundaries (. ! ?)</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Interim max lines:</label>
+						<input type="number" id="modalInterimMaxlines" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Limit in-progress text to N lines (for long unbroken speech)</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Max words:</label>
+						<input type="number" id="modalMaxwords" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Truncate in-progress text to last N words (0 = off)</div>
+				</div>
+				<div class="modal-group" style="display:none;">
+					<div class="modal-row">
+						<label>Max characters:</label>
+						<input type="number" id="modalMaxchars" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Truncate in-progress text to last N characters</div>
+				</div>
+			</div>
+
+			<div class="modal-section">
+				<h3>Text to Speech</h3>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Enable TTS:</label>
+						<input type="checkbox" id="modalTTS" />
+					</div>
+					<div class="modal-help">Read captions aloud using browser speech synthesis</div>
+				</div>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>TTS voice:</label>
+						<input type="text" id="modalTTSLang" placeholder="e.g., en-US" />
+					</div>
+					<div class="modal-help">Language/voice code (leave blank for system default)</div>
+				</div>
+			</div>
+
+			<div class="url-preview">
+				<strong>Overlay URL (for OBS/vMix):</strong><br/>
+				<span id="modalUrlPreview">Loading...</span>
+			</div>
+			<div id="captureNote" class="capture-note" style="display:none;">
+				<strong>Note:</strong> Fast speech options need to be added to this capture page's URL: <code id="captureParams" style="background:#1e2430; padding:2px 6px; border-radius:3px;"></code>
+			</div>
+
+			<div class="modal-actions">
+				<button class="cancel-btn" onclick="closeCustomizeModal()">Cancel</button>
+				<button class="copy-btn" onclick="copyCustomizedUrl()">Copy Overlay URL</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+	// Customize Overlay Modal Functions
+	function openCustomizeModal() {
+		document.getElementById('customizeModal').classList.add('open');
+		updateModalUrlPreview();
+	}
+
+		function closeCustomizeModal() {
+			document.getElementById('customizeModal').classList.remove('open');
+		}
+
+		function updateModalTranslationProviderUI() {
+			const provider = (document.getElementById('modalTranslateProvider').value || 'auto').toLowerCase();
+			const keyGroup = document.getElementById('modalProviderKeyGroup');
+			const keyLabel = document.getElementById('modalProviderKeyLabel');
+			const keyHelp = document.getElementById('modalProviderKeyHelp');
+			const keyInput = document.getElementById('modalGoogleKey');
+			const urlGroup = document.getElementById('modalProviderUrlGroup');
+			const urlLabel = document.getElementById('modalProviderUrlLabel');
+			const urlInput = document.getElementById('modalProviderUrl');
+			const modelGroup = document.getElementById('modalProviderModelGroup');
+			const modelLabel = document.getElementById('modalProviderModelLabel');
+			const modelInput = document.getElementById('modalProviderModel');
+
+			let showKey = true;
+			let showAdvanced = false;
+
+			if (provider === 'local') {
+				showKey = false;
+			} else if (provider === 'google') {
+				keyLabel.textContent = 'Google API Key:';
+				keyHelp.textContent = 'For 100+ languages via Google Cloud Translation (paid)';
+				keyInput.placeholder = 'Required for Google Cloud';
+			} else if (provider === 'openai') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key:';
+				keyHelp.textContent = 'Used as tkey for OpenAI-compatible endpoints.';
+				keyInput.placeholder = 'Bearer token (if required)';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'https://api.openai.com/v1';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'gpt-4o-mini';
+			} else if (provider === 'anthropic') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key:';
+				keyHelp.textContent = 'Used as tkey/translatekey for Anthropic.';
+				keyInput.placeholder = 'Anthropic API key';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'https://api.anthropic.com/v1/messages';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'claude-3-5-haiku-latest';
+			} else if (provider === 'ollama') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key (optional):';
+				keyHelp.textContent = 'Usually optional for local Ollama servers.';
+				keyInput.placeholder = 'Optional';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'http://127.0.0.1:11434/v1';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'llama3.1';
+			} else {
+				keyLabel.textContent = 'Google API Key (optional):';
+				keyHelp.textContent = 'Auto mode uses local translation unless a Google key is provided.';
+				keyInput.placeholder = 'Optional';
+			}
+
+			keyGroup.style.display = showKey ? '' : 'none';
+			urlGroup.style.display = showAdvanced ? '' : 'none';
+			modelGroup.style.display = showAdvanced ? '' : 'none';
+		}
+
+		function updateModalUrlPreview() {
+			updateModalTranslationProviderUI();
+			const base = url + "/overlay?room=" + roomID;
+			const params = [];
+
+			// Translation
+			const translate = document.getElementById('modalTranslate').value;
+			if (translate) params.push('translate=' + translate);
+			if (document.getElementById('modalDual').checked) params.push('dual=1');
+			const provider = (document.getElementById('modalTranslateProvider').value || 'auto').toLowerCase();
+			const googleKey = document.getElementById('modalGoogleKey').value.trim();
+			const providerUrl = document.getElementById('modalProviderUrl').value.trim();
+			const providerModel = document.getElementById('modalProviderModel').value.trim();
+			if (translate) {
+				if (provider === 'local') {
+					params.push('forcelocal=1');
+				} else if (provider === 'google') {
+					params.push('tprovider=google');
+					if (googleKey) params.push('googlekey=' + encodeURIComponent(googleKey));
+				} else if (provider === 'openai' || provider === 'anthropic' || provider === 'ollama') {
+					params.push('tprovider=' + provider);
+					if (googleKey) params.push('tkey=' + encodeURIComponent(googleKey));
+					if (providerUrl) params.push('turl=' + encodeURIComponent(providerUrl));
+					if (providerModel) params.push('tmodel=' + encodeURIComponent(providerModel));
+				} else if (googleKey) {
+					params.push('googlekey=' + encodeURIComponent(googleKey));
+				}
+			}
+
+		// Display options
+		const maxlines = parseInt(document.getElementById('modalMaxlines').value) || 0;
+		if (maxlines > 0) params.push('maxlines=' + maxlines);
+		const showtime = parseInt(document.getElementById('modalShowtime').value);
+		if (!isNaN(showtime) && showtime !== 5000) params.push('showtime=' + showtime);
+		if (document.getElementById('modalClear').checked) params.push('clear');
+
+		// Interim handling (overlay params)
+		const interimMaxlines = parseInt(document.getElementById('modalInterimMaxlines').value) || 0;
+		if (interimMaxlines > 0) params.push('interimmaxlines=' + interimMaxlines);
+
+		// TTS
+		if (document.getElementById('modalTTS').checked) {
+			const ttsLang = document.getElementById('modalTTSLang').value.trim();
+			params.push('tts=' + (ttsLang || '1'));
+		}
+
+		const finalUrl = base + (params.length ? '&' + params.join('&') : '');
+		document.getElementById('modalUrlPreview').textContent = finalUrl;
+
+		// Capture URL params (these go on the capture page, not overlay)
+		const captureParams = [];
+		const autofinal = parseInt(document.getElementById('modalAutofinal').value) || 0;
+		const maxwords = parseInt(document.getElementById('modalMaxwords').value) || 0;
+		const maxchars = parseInt(document.getElementById('modalMaxchars').value) || 0;
+		const autosplit = document.getElementById('modalAutosplit').checked;
+
+		if (autofinal > 0) captureParams.push('autofinal=' + autofinal);
+		if (maxwords > 0) captureParams.push('maxwords=' + maxwords);
+		if (maxchars > 0) captureParams.push('maxchars=' + maxchars);
+		if (autosplit) captureParams.push('autosplit');
+
+		const captureNoteEl = document.getElementById('captureNote');
+		if (captureParams.length > 0) {
+			captureNoteEl.style.display = 'block';
+			document.getElementById('captureParams').textContent = '&' + captureParams.join('&');
+		} else {
+			captureNoteEl.style.display = 'none';
+		}
+	}
+
+	function copyCustomizedUrl() {
+		const urlText = document.getElementById('modalUrlPreview').textContent;
+		navigator.clipboard.writeText(urlText).then(() => {
+			const btn = document.querySelector('.modal-actions .copy-btn');
+			btn.textContent = 'Copied!';
+			setTimeout(() => btn.textContent = 'Copy Overlay URL', 2000);
+		});
+	}
+
+		// Add event listeners for live URL preview
+		document.querySelectorAll('#customizeModal input, #customizeModal select').forEach(el => {
+			el.addEventListener('change', updateModalUrlPreview);
+			el.addEventListener('input', updateModalUrlPreview);
+		});
+
+	// Close modal on background click
+	document.getElementById('customizeModal').addEventListener('click', function(e) {
+		if (e.target === this) closeCustomizeModal();
+	});
+
+	// Close modal on Escape key
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'Escape' && document.getElementById('customizeModal').classList.contains('open')) {
+			closeCustomizeModal();
+		}
+	});
+	</script>
+
 	</body>
 </html>

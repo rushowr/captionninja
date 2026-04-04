@@ -78,9 +78,11 @@ CAPTION.Ninja offers multiple ways to translate content:
 
 Use https://caption.ninja/translate for real-time translation capabilities:
 - Select source and target languages from the dropdown menus
-- Browser-based transcription + Mozilla's free translation service
-- Optional Google Cloud Translation integration for premium results
+- Browser-based transcription + Mozilla's free translation service (17 languages)
+- Optional Google Cloud Translation integration for premium results (100+ languages)
 - Works with the same overlay system
+
+Free translation languages supported: Bulgarian (bg), Czech (cs), Dutch (nl), English (en), Estonian (et), German (de), French (fr), Icelandic (is), Italian (it), Norwegian Bokmål (nb), Norwegian Nynorsk (nn), Persian (fa), Polish (pl), Portuguese (pt), Russian (ru), Spanish (es), Ukrainian (uk)
 
 ### Method 2: Multiple Language Outputs from Single Source
 
@@ -108,6 +110,78 @@ Benefits of this approach:
 
 Note: The translation quality using this method relies on the viewer's browser capabilities and may vary compared to the dedicated translation page.
 
+### Method 2.5: Show Translation + Transcript in One Overlay
+
+Prefer one browser source that shows both languages? Add `&dual=1` (or `&view=dual`) to any translated overlay URL. The translated line renders first and the original transcript appears beneath it in a compact style, so the overlay stays roughly the same height.
+
+```
+https://caption.ninja/overlay?room=abc123&translate=ja&googlekey=YOUR_API_KEY&dual=1
+```
+
+`&clear`, `&showtime`, `&maxlines`, and other history flags still apply to the combined block, and TTS continues speaking the translated text while the original is just displayed.
+
+### Method 3: Premium/Remote Translation in Overlay
+
+For professional-quality translation with 100+ language support, you can use Google Cloud or other remote providers directly in the overlay:
+
+```
+https://caption.ninja/overlay?room=abc123&translate=ja&googlekey=YOUR_API_KEY
+```
+
+Features:
+- **Context-aware translation**: Add `&context=1` for better accuracy in conversations
+- **Adjustable context size**: Use `&contextsize=5` to include more previous messages
+- **Force local translation**: Add `&forcelocal=1` to use Mozilla even with API key
+- **Override source language**: Use `&fromlang=es` if auto-detection isn't working
+
+Example with all features:
+```
+https://caption.ninja/overlay?room=abc123&translate=ko&googlekey=KEY&context=1&contextsize=3
+```
+
+This provides professional-grade translation quality while maintaining the simple overlay system.
+
+Example (OpenAI-compatible provider):
+```
+https://caption.ninja/overlay?room=abc123&translate=ja&tprovider=openai&tmodel=gpt-4o-mini&tkey=YOUR_API_KEY
+```
+
+### Translation Parameters Reference
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `translate=XX` or `lang=XX` or `ln=XX` | Target translation language | `&translate=es` |
+| `fromlang=XX` | Override source language detection | `&fromlang=en` |
+| `googlekey=KEY` or `gkey=KEY` | Google Cloud Translation API key | `&googlekey=YOUR_KEY` |
+| `tprovider=google|openai|anthropic|ollama|local` | Select remote/local translation provider | `&tprovider=openai` |
+| `tkey=KEY` or `translatekey=KEY` | API key for non-Google remote providers | `&tkey=YOUR_KEY` |
+| `turl=URL` | Custom API base URL for proxy/self-hosted providers | `&turl=http://127.0.0.1:11434/v1` |
+| `tmodel=MODEL` | Model id for OpenAI-compatible/Anthropic/Ollama | `&tmodel=gpt-4o-mini` |
+| `context=1` | Enable context-aware translation | `&context=1` |
+| `contextsize=N` | Number of previous messages for context (default: 2) | `&contextsize=5` |
+| `forcelocal=1` | Force Mozilla translation even with API key | `&forcelocal=1` |
+
+For a comprehensive guide to all translation features, visit: https://caption.ninja/translation-guide.html
+
+## TTS Integration
+
+Caption.Ninja can read captions aloud using browser/system TTS or the tts.rocks engine (Kokoro, Piper, ElevenLabs, Google, OpenAI, etc.). Enable it via URL parameters; nothing changes by default.
+
+- Overlay readout: `overlay.html?room=abc123&tts=en-US`
+  - Built‑in providers: `&ttsprovider=google&ttskey=YOUR_KEY`, `&ttsprovider=elevenlabs&elevenlabskey=KEY&voice11=VOICE_ID`
+  - Use tts.rocks engine: `&ttslib=rocks&ttsprovider=kokoro&voicekokoro=af_aoede&korospeed=1.0`
+  - Optional interim streaming: `&ttsstream=1`
+- Capture readout: `index.html?room=abc123&lang=en-US&tts=en-US`
+- Manual readout: `manual.html?room=abc123&tts=en-US`
+- Pop‑out TTS window (tts.rocks bridge): add `&ttspopout=1` to auto‑open, or go directly:
+  - `tts.rocks/caption-bridge.html?room=abc123&tts=en-US&ttsprovider=kokoro`
+
+Quick discovery (GUI):
+- tts.rocks homepage now includes a “Use with Caption.Ninja” panel to generate ready‑to‑use links (Overlay, Capture, Manual, Bridge) based on your chosen engine, keys, voices, and rates.
+- Voice picker and URL builder: `tts.rocks/tts.html` lists local voices and generates example URLs.
+
+Security note: API keys in URLs are visible to anyone with the link. Prefer local/native providers when possible, or only share overlays that do not embed keys.
+
 ## Language Support
 
 Default language is `&lang=en-US`. Change the language by adding a language code parameter.
@@ -120,6 +194,32 @@ For situations where automatic transcription isn't ideal, use manual text entry:
 https://caption.ninja/manual.html
 
 This lets you type captions directly, which appear on the same overlay system.
+
+## Transcript Playlist + Credits Roll
+
+For pre-written scripts or long transcripts, use the new playlist tools:
+
+- transcript.html: Build a playlist of sections, edit/reorder live, and auto-play to the room.
+  - Controls: Play, Pause/Resume, Restart, Prev/Next, per-section play, and a Speed slider (0.5x–2.0x).
+  - Pacing: Sensible timing that slows slightly for punctuation and long numbers; editable while another section plays.
+  - Optional: Toggle “Control credits overlay” to drive a rolling credits page remotely.
+- overlay_roll.html: Credits-style rolling overlay that scrolls lines upward.
+  - Manual speed from controller; or add `&auto=1` to auto-adjust speed by matching live STT text in the same room.
+  - Appearance: Set `&fontsize=3.2` (em units) to scale the roll.
+
+Quick start (serve over HTTP):
+
+```
+Transcript controller:
+  /transcript.html?room=abc123
+Credits roll overlay:
+  /overlay_roll.html?room=abc123        (manual speed)
+  /overlay_roll.html?room=abc123&auto=1 (auto speed from STT)
+Standard captions (optional, in parallel):
+  /overlay.html?room=abc123
+```
+
+Tip: You can also add `&label=Host` to tag outgoing transcript captions from the controller.
 
 ## Customizing Appearance
 
@@ -189,13 +289,109 @@ https://caption.ninja/overlay?room=abc123&html
 
 ![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
 
-### Caption Display Time
+### Custom Term Mapping (URL-only)
 
-Specify how long messages stay visible with:
+For specialized vocabulary (acronyms, scientific terms), you can pass replacement and restricted-word rules directly in the capture URL.
+
+- `map=` supports direct mappings in `from=>to` format (comma or newline separated)
+- `restricted=` lists words/phrases to mask in output
+- `match=` controls fallback matching mode: `phonetic` (default), `word`, or `substring`
+
+Examples:
 ```
-&showtime=5000
+# Direct mapping list + restricted terms
+https://caption.ninja/?room=abc123&map=arrow=>ARO,error=>ARO&restricted=third reich
+
+# Translation page with direct mappings
+https://caption.ninja/translate?room=abc123&map=auricle=>auricle,pinna=>pinna
+
+# Force exact whole-word mode (disable phonetic fallback)
+https://caption.ninja/?room=abc123&map=arrow=>ARO&match=word
 ```
-Time is in milliseconds. Setting to 0 will disable auto-hiding.
+
+Matching behavior:
+- Direct mappings are always applied first.
+- Phonetic/fuzzy matching is fallback-only and runs only when no direct mapping matched that word.
+- Restricted words are masked after replacements.
+
+Tip: URL-encode special characters (`>`, spaces, commas) when generating links programmatically.
+
+### Overlay Display Control
+
+Control how long text remains visible and how much history is kept on the overlay:
+
+- `&showtime=MS`: inactivity-based auto-clear. After the last message, the overlay clears after MS milliseconds (default: `5000`). When new messages keep arriving, the timer resets; nothing clears until input stops.
+- `&clear`: clear on every final message. Shows only the latest line. Note: Enabling “Translate with added context?” on the translate page sets a `c` flag per message that the overlay treats like `&clear`.
+- `&maxlines=N`: keep only the most recent N final lines; older lines are trimmed even while new messages arrive.
+- `&maxage=MS`: remove lines older than MS milliseconds, pruning continuously during live updates.
+- `&intermclear=1`: hide previously finalized lines whenever interim text is streaming, freeing vertical space while still showing the in-progress sentence.
+
+Examples:
+```
+.../overlay?room=abc123&clear                  # Always just the latest line
+.../overlay?room=abc123&showtime=1500          # Faster inactivity clear
+.../overlay?room=abc123&maxlines=3             # Keep last 3 lines while active
+.../overlay?room=abc123&maxage=10000           # Drop lines older than 10s
+.../overlay?room=abc123&maxlines=2&maxage=8000 # Combine both
+.../overlay?room=abc123&intermclear=1          # Only show the interim/current line
+```
+
+### Interim Text Handling
+
+Browser speech recognition sometimes produces very long "interim" (non-finalized) results without breaking them into sentences. This is common when captioning talk shows, pre-recorded audio, or streams with continuous speech. The following options help manage long interim text blocks:
+
+#### Capture Page Options (index.html & translate.html)
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `&autofinal=MS` | Force finalization after MS milliseconds of silence (0=disabled, 800 recommended) | `&autofinal=800` |
+| `&maxwords=N` | Truncate interim text to last N words | `&maxwords=50` |
+| `&maxchars=N` | Truncate interim text to last N characters | `&maxchars=200` |
+| `&autosplit` | Auto-finalize on sentence boundaries (. ! ?) | `&autosplit` |
+
+On `translate.html`, these options are also available via UI controls in the **"Interim Text Handling"** section (no URL parameters needed).
+
+#### Overlay Page Options (overlay.html)
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `&interimmaxlines=N` | Limit interim text display to approximately N lines (by sentence or word count). Defaults to `maxlines` value if set. | `&interimmaxlines=3` |
+
+Examples:
+```
+# Capture with auto-finalization after 800ms silence (recommended for talk shows)
+.../index.html?room=abc123&autofinal=800
+
+# Capture with word limit and sentence auto-split
+.../index.html?room=abc123&maxwords=50&autosplit
+
+# Translate page with interim handling (great for esports/fast speech)
+.../translate?lang=en-US&translate=fr&room=abc123&autofinal=800&autosplit
+
+# Overlay with interim-aware line limiting
+.../overlay?room=abc123&maxlines=3&interimmaxlines=3
+
+# Combine capture and overlay options for best results
+# On capture page: ?room=abc123&autofinal=800&autosplit
+# On overlay page: ?room=abc123&maxlines=3
+```
+
+### Customize Overlay Button
+
+The main capture page (`index.html`) includes a **"Customize Overlay"** button that opens a modal dialog for building overlay URLs without manually editing query parameters. Options include:
+
+- Translation language, dual-overlay mode, and provider selection (`Auto`, `Local`, `Google`, `OpenAI-compatible`, `Anthropic`, `Ollama`)
+- Provider-specific translation fields (API key, optional endpoint URL, optional model)
+- Display options (maxlines, showtime, clear)
+- Interim text handling settings
+- TTS configuration
+- Live URL preview with copy button
+
+### Build Overlay Links from translate.html
+
+On the translate page, scroll to “Overlay link options” to customize your overlay URL. You can toggle “Clear on each final”, set `showtime`, and add `maxlines` and `maxage`. The share link at the top updates automatically; copy it into OBS/vMix.
+
+These options work alongside TTS settings (if enabled) and translation parameters.
 
 ### Saving Transcriptions
 
@@ -205,6 +401,24 @@ To save the transcription:
 3. Paste into a text editor (Ctrl+V)
 
 Alternatively, use the "Download transcription" button that appears during sessions.
+
+## Capture Pages
+
+- `index.html`: Simple, minimal capture experience. Uses your browser’s default microphone and built-in speech recognition (best in Chrome/Edge). Downloads SRT and streams to overlay.
+  - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps).
+- `capture-pro.html`: A newer enhanced Capture UI page with better usability and exports. Same local recognition under the hood, plus:
+  - Pause-based segmentation (configurable threshold) for cleaner SRT cues
+  - Smarter line wrapping for SRT/WebVTT
+  - One-click downloads: SRT, WebVTT, Plain Text
+  - Autosave + recovery of last session
+  - Keyboard shortcuts: Space (pause/resume), Ctrl+S (download SRT), Ctrl+L (copy overlay URL), M (chapter mark)
+  - Status indicators for recognition and overlay connection
+  - Overlay link helper with one-click copy
+  - Optional profanity masking
+
+Notes:
+- Mic device selection remains on the premium STT track; this page uses the system default microphone (same as `index.html`).
+- TTS popout bridge is supported via `&ttspopout=1`.
 
 ## Self-Hosting
 
@@ -227,6 +441,12 @@ Free support is available at https://discord.vdo.ninja
 
 Ask for @steve for help in the #miscellaneous or #vdo-ninja-support channels.
 
+For websocket delivery issues (for example: captions appear locally but not in room), open browser dev tools and run:
+```
+copyWsDebugInfo()
+```
+Then share that output with your bug report. It includes connection state, retry count, queued/dropped message counts, and last websocket error.
+
 For email support: steve@seguin.email (support is limited and not guaranteed)
 
 ## Disclaimers
@@ -244,5 +464,7 @@ That said, things change, and problems occur, so you accept any risks to using t
 Fonts are provided with their own license; apache 2.0 I believe, but confirm yourself.
 
 The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+
+
 
 As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
