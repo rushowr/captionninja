@@ -4,7 +4,8 @@
 	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
 	<meta content="utf-8" http-equiv="encoding" />
 	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
-	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+	<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+	<link rel="shortcut icon" href="favicon.svg" />
 	<title>Caption Overlay Window</title>
 	<meta name="title" content="CAPTION.Ninja: Overlay" />
 	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
@@ -45,6 +46,25 @@
 			background-color: black; 
 			padding: 8px 8px 0px 8px;
 			margin:0;
+			max-width: 100%;
+		}
+		.output .dual-line {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15em;
+			line-height: 1.05em;
+			padding: 0;
+			background-color: transparent;
+		}
+		.output .dual-translation {
+			font-size: 0.9em;
+			padding: 4px 8px 0px 8px;
+		}
+		.output .dual-original {
+			font-size: 0.65em;
+			opacity: 0.85;
+			letter-spacing: normal;
+			padding: 2px 8px 0px 8px;
 		}
 		
 		a {
@@ -54,10 +74,12 @@
 	</style>
 </head>
 <body>
-	
+	 
 	<div id="interm" class="output"></div>
 	<div id="output" class="output"></div>
 	<div id="status" style="display:none;"></div>
+	<script src="tts-integration.js"></script>
+	<script src="translation-providers.js"></script>
 	<script>
 	
 	(function (w) {
@@ -117,6 +139,50 @@
 	const translationLang = hasTranslation ? 
 	  (translationParams.map(param => urlParams.get(param)).find(val => val) || "en") : false;
 	const langTo = translationLang ? translationLang.split("-")[0] : false;
+	const dualOverlay = langTo && (
+		urlParams.has("dual") ||
+		urlParams.has("dualoverlay") ||
+		urlParams.has("showboth") ||
+		urlParams.get("view") === "dual"
+	);
+
+	// Translation provider settings
+	const fallbackGoogleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
+	const fallbackAutoDetect = urlParams.has("autodetect") || urlParams.get("fromlang") === "auto";
+	const forceLocal = urlParams.has("forcelocal");
+	const translationConfigBase = (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig)
+		? window.CaptionTranslationProviders.resolveConfig(urlParams, { forceLocal: forceLocal })
+		: {
+			provider: fallbackGoogleApiKey ? "google" : "local",
+			apiKey: fallbackGoogleApiKey || "",
+			googleApiKey: fallbackGoogleApiKey || "",
+			endpoint: "",
+			model: "",
+			forceLocal: forceLocal,
+			autoDetect: fallbackAutoDetect
+		};
+	const translationProvider = translationConfigBase.provider || "local";
+	const googleApiKey = translationConfigBase.googleApiKey || fallbackGoogleApiKey || false;
+	const autoDetectLang = Boolean(translationConfigBase.autoDetect);
+
+	// Context settings
+	const useContext = urlParams.has("context") || urlParams.has("fullcontext");
+	const contextSize = parseInt(urlParams.get("contextsize")) || 2;
+	let messageHistory = [];
+
+	// Translation cache for remote provider responses
+	const translationCache = new Map();
+	const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+	function preserveOriginal(meta, text, isInterim){
+		if (!dualOverlay || !meta || !text) {
+			return;
+		}
+		const key = isInterim ? "originalInterm" : "originalFinal";
+		if (!meta[key]) {
+			meta[key] = text;
+		}
+	}
 
 	// TTS settings initialization - only set if explicitly specified
 	const ttsParams = ["speech", "speak", "tts"];
@@ -172,6 +238,72 @@
 			}
 		}
 	}
+	
+	async function translateViaProvider(text, sourceLang, targetLang) {
+		if (!text.trim()) {
+			return null;
+		}
+		if (!window.CaptionTranslationProviders || !window.CaptionTranslationProviders.translateText) {
+			return null;
+		}
+
+		const useAutoDetect = autoDetectLang || sourceLang === "auto";
+		const requestConfig = Object.assign({}, translationConfigBase, {
+			autoDetect: useAutoDetect
+		});
+
+		if (!window.CaptionTranslationProviders.canUseRemoteProvider(requestConfig)) {
+			return null;
+		}
+
+		const cacheKey = window.CaptionTranslationProviders.buildCacheKey(
+			requestConfig,
+			text,
+			sourceLang,
+			targetLang,
+			useAutoDetect
+		);
+		if (!useAutoDetect) {
+			const cached = translationCache.get(cacheKey);
+			if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+				return cached.translation;
+			}
+		}
+
+		const result = await window.CaptionTranslationProviders.translateText(
+			requestConfig,
+			text,
+			sourceLang,
+			targetLang
+		);
+		if (!result || !result.translatedText) {
+			return null;
+		}
+
+		if (useAutoDetect && result.detectedSourceLanguage) {
+			console.log(`Auto-detected language: ${result.detectedSourceLanguage}`);
+		}
+
+		if (!useAutoDetect) {
+			translationCache.set(cacheKey, {
+				translation: result.translatedText,
+				timestamp: Date.now(),
+				detectedLang: result.detectedSourceLanguage || null
+			});
+		}
+
+		return result.translatedText;
+	}
+	
+	// Clean up old cache entries periodically
+	setInterval(() => {
+		const now = Date.now();
+		for (const [key, value] of translationCache.entries()) {
+			if (now - value.timestamp > CACHE_DURATION) {
+				translationCache.delete(key);
+			}
+		}
+	}, 60 * 60 * 1000); // Run every hour
 	
 	class TextToSpeech {
 	  constructor(urlParams = new URLSearchParams(window.location.search)) {
@@ -553,52 +685,145 @@
 	// document.body.appendChild(tts.createUI());
 	
 	if (langTo){
-		var langFrom = "en";
-		if (window.Worker) {
-			worker = new Worker("worker.js");
-			worker.postMessage(["import"]);
+		// Handle auto-detect: langFrom will be "auto" when auto-detection is enabled
+		var langFrom = autoDetectLang ? "auto" : (urlParams.get("fromlang") || "en");
+		// With auto-detect, we always need translation (provider determines source language)
+		var needsTranslation = autoDetectLang || (langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase());
+		let remoteTranslationEnabled = (translationProvider !== "local") && !forceLocal;
+		
+		if (translationProvider === "google" && remoteTranslationEnabled && !googleApiKey) {
+			remoteTranslationEnabled = false;
+			console.warn("Google provider selected without API key. Add &googlekey=YOUR_KEY or switch providers.");
+			status("Google provider requires API key");
+		}
+		
+		// Only initialize local translation if remote provider is not active.
+		// Note: Local translation (Bergamot) does NOT support auto-detect.
+		if (needsTranslation && !remoteTranslationEnabled && !autoDetectLang) {
+			if (window.Worker) {
+				worker = new Worker("worker.js");
+				worker.postMessage(["import"]);
+			}
+		}
+		
+		// Warn if auto-detect is enabled without a remote provider.
+		if (autoDetectLang && !remoteTranslationEnabled) {
+			console.warn("Auto-detect language requires a remote translation provider.");
+			status("Auto-detect requires remote provider");
 		}
 
-		var translateCall = (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
-			if (!text.trim().length) return;
-			const paragraphs = text.split("\n");
-			worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
-		};
-
-		worker.onmessage = function (e) {
-			if (e.data[0] === "translate_reply" && e.data[1]) {
-				if (!e.data[2]){
-					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
-				} else if (e.data[2].final){
-					e.data[2].final = e.data[1].join("<br /><br />");
-					processReply(e.data[2], (e.data[3]||false));
-				} else if (e.data[2].interm){
-					e.data[2].interm = e.data[1].join("<br /><br />");
-					processReply(e.data[2], (e.data[3]||false));
-				} else {
-					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+			var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+				if (!text.trim().length) return;
+				
+				const isInterim = Boolean(interm);
+				if (dualOverlay && meta) {
+					const sourceText = isInterim ? (meta?.interm || text) : (meta?.final || text);
+					if (sourceText) {
+						preserveOriginal(meta, sourceText, isInterim);
+					}
 				}
-			} else if (e.data[0] === "load_model_reply" && e.data[1]) {
-				status(e.data[1]);
-			} else if (e.data[0] === "import_reply" && e.data[1]) {
-				modelRegistry = e.data[1];
-				version = e.data[2];
-				init();
-			}
-		};
+				
+				const passThroughText = () => {
+					if (!meta){
+						document.getElementById("output").innerText = text;
+					} else if (meta.final){
+						processReply(meta, interm);
+					} else if (meta.interm){
+						processReply(meta, interm);
+					} else {
+						document.getElementById("output").innerText = text;
+					}
+				};
+				
+				// Check if translation is needed (recalculate in case langFrom changed)
+				// With auto-detect, always attempt translation
+				needsTranslation = autoDetectLang || (langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase());
+				
+				// Pass through if same language (but not if using auto-detect)
+				if (!needsTranslation && !autoDetectLang) {
+					passThroughText();
+					return;
+				}
+				
+				// Use remote translation provider if enabled.
+				if (remoteTranslationEnabled) {
+				try {
+					const translation = await translateViaProvider(text, langFrom, langTo);
+					if (translation) {
+						if (!meta){
+							document.getElementById("output").innerText = translation;
+						} else if (meta.final){
+							meta.final = translation;
+							processReply(meta, interm);
+						} else if (meta.interm){
+							meta.interm = translation;
+							processReply(meta, interm);
+							} else {
+								document.getElementById("output").innerText = translation;
+							}
+							return;
+						}
+					} catch (error) {
+						console.error("Remote translation failed, falling back to local:", error);
+						status(`Translation error: ${error.message}`);
+						// Fall back to local translation if available.
+						if (worker) {
+							const paragraphs = text.split("\n");
+							worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
+							return;
+						}
+					}
+				} else if (worker) {
+					// Use local translation
+					const paragraphs = text.split("\n");
+					worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
+					return;
+				}
+				
+				// Safe fallback when translation is unavailable.
+				passThroughText();
+			};
+
+		if (worker) {
+			worker.onmessage = function (e) {
+				if (e.data[0] === "translate_reply" && e.data[1]) {
+					if (!e.data[2]){
+						document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+					} else if (e.data[2].final){
+						e.data[2].final = e.data[1].join("<br /><br />");
+						processReply(e.data[2], (e.data[3]||false));
+					} else if (e.data[2].interm){
+						e.data[2].interm = e.data[1].join("<br /><br />");
+						processReply(e.data[2], (e.data[3]||false));
+					} else {
+						document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+					}
+				} else if (e.data[0] === "load_model_reply" && e.data[1]) {
+					status(e.data[1]);
+				} else if (e.data[0] === "import_reply" && e.data[1]) {
+					modelRegistry = e.data[1];
+					version = e.data[2];
+					init();
+				}
+			};
+		}
 
 		var isSupported = (lngFrom, lngTo) => {
 			return true; //(`${lngFrom}${lngTo}` in modelRegistry) || ((`${lngFrom}en` in modelRegistry) && (`en${lngTo}` in modelRegistry))
 		}
 
 		var loadModel = () => {
-			if (langFrom !== langTo) {
+			// Recalculate if translation is needed
+			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+			
+			if (needsTranslation && worker) {
 				status(`Installing model...`);
 				console.log(`Loading model '${langFrom}${langTo}'`);
 				worker.postMessage(["load_model", langFrom, langTo]);
+			} else if (!needsTranslation) {
+				console.log("Same language - no translation needed");
 			} else {
 				console.log("No model loaded yet");
-				// do nothing.
 			}
 		};
 
@@ -627,12 +852,128 @@
 	} else if (urlParams.has("ROOM")){
 		roomID = urlParams.get("ROOM");
 	} else {
-		window.location.href = "./speechin";
+		// Try to use a previously stored room ID before redirecting
+		try {
+			var storedRoom = localStorage.getItem('cn_room_id') || "";
+			if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) {
+				roomID = storedRoom;
+				if (typeof updateURL === 'function') {
+					updateURL("room="+roomID);
+				}
+			} else {
+				window.location.href = "./speechin";
+			}
+		} catch (e) {
+			window.location.href = "./speechin";
+		}
 	}
+	// Persist the room ID for future sessions
+	try { localStorage.setItem('cn_room_id', roomID); } catch (e) {}
 	
 	var clearOnNew = false;
 	if (urlParams.has("clear")){
 		clearOnNew = true;
+	}
+	var intermClear = urlParams.has("intermclear");
+	
+	// Optional: limit the number of lines shown
+	var maxLines = null;
+	(function(){
+		let val = null;
+		if (urlParams.has("maxlines")) {
+			val = parseInt(urlParams.get("maxlines"));
+		} else if (urlParams.has("maxrows")) {
+			// Support legacy/alternate param name
+			val = parseInt(urlParams.get("maxrows"));
+		} else if (urlParams.has("rows")) {
+			val = parseInt(urlParams.get("rows"));
+		} else if (urlParams.has("lines")) {
+			val = parseInt(urlParams.get("lines"));
+		}
+		if (!isNaN(val) && val > 0) {
+			maxLines = val;
+			// Ensure each entry occupies only one visual line; overflow gets ellipsis
+			try {
+				var style = document.createElement('style');
+				style.type = 'text/css';
+				style.textContent = `#output, #interm { white-space: nowrap; overflow: hidden; }\n#output span, #interm span { white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }`;
+				document.head.appendChild(style);
+			} catch(e) {}
+		}
+	})();
+
+	// Option 3: Interim-aware maxlines (defaults to maxLines if not specified)
+	var interimMaxLines = null;
+	(function(){
+		let val = null;
+		if (urlParams.has("interimmaxlines")) {
+			val = parseInt(urlParams.get("interimmaxlines"));
+		} else if (urlParams.has("intermaxlines")) {
+			val = parseInt(urlParams.get("intermaxlines"));
+		}
+		if (!isNaN(val) && val > 0) {
+			interimMaxLines = val;
+		} else if (maxLines) {
+			// Default to same as maxLines
+			interimMaxLines = maxLines;
+		}
+	})();
+
+	// Truncate text to approximate N lines by sentence or word count
+	function truncateToLines(text, targetLines) {
+		if (!targetLines || !text) return text;
+
+		// First, try splitting on sentence boundaries
+		const sentencePattern = /[.!?]+\s+/g;
+		const sentences = text.split(sentencePattern).filter(s => s.trim());
+
+		if (sentences.length > targetLines) {
+			// Keep only the last N sentences
+			return "..." + sentences.slice(-targetLines).join('. ');
+		}
+
+		// If we have fewer sentences than target, try word-based limiting
+		// Estimate ~12 words per "line"
+		const wordsPerLine = 12;
+		const maxWordCount = targetLines * wordsPerLine;
+		const words = text.split(/\s+/);
+
+		if (words.length > maxWordCount) {
+			return "..." + words.slice(-maxWordCount).join(' ');
+		}
+
+		return text;
+	}
+
+	function adjustIntermVisibility(){
+		if (!maxLines) return;
+		const out = document.getElementById("output");
+		const inter = document.getElementById("interm");
+		if (!out || !inter) return;
+		let brs = out.querySelectorAll('br').length;
+		if (brs >= maxLines) {
+			inter.style.display = 'none';
+		} else {
+			inter.style.display = '';
+		}
+	}
+
+	function enforceMaxLines(){
+		if (!maxLines) return;
+		const out = document.getElementById("output");
+		if (!out) return;
+		let brs = out.querySelectorAll('br');
+		while (brs.length > maxLines) {
+			// Remove nodes from the start until and including the first <br>
+			while (out.firstChild && out.firstChild.nodeName.toLowerCase() !== 'br') {
+				out.removeChild(out.firstChild);
+			}
+			if (out.firstChild && out.firstChild.nodeName.toLowerCase() === 'br') {
+				out.removeChild(out.firstChild);
+			}
+			brs = out.querySelectorAll('br');
+		}
+		adjustIntermVisibility();
 	}
 	
 	var timeoutSpeed = 5000;
@@ -648,6 +989,7 @@
 	var idle = null;
 
 	var socket;
+	var reconnectTimer = null;
 	let retryCount = 0;
 	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
 	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
@@ -660,67 +1002,139 @@
 		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
 		return delay;
 	}
-
-	function connectWebSocket() {
-		if (socket) {
-			socket.close();
-			socket = null;
-		}
-
-		socket = new WebSocket("wss://api.caption.ninja:443");
-
-		socket.onclose = function() {
-			console.log("WebSocket connection closed. Attempting to reconnect...");
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
-
-		socket.onopen = function() {
-			console.log("WebSocket connected. Joining room...");
-			// Reset retry count on successful connection
-			retryCount = 0;
-			socket.send(JSON.stringify({"join":roomID}));
-		};
-
-		socket.onerror = function(error) {
-			console.error("WebSocket error:", error);
-			if (socket) {
-				socket.close();
-				socket = null;
-			}
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
-	}
-
-	connectWebSocket();
 	
-	socket.addEventListener('message', function (event) {
-	  if (event.data) {
-		const data = JSON.parse(event.data);
+	function clearReconnectTimer() {
+		if (reconnectTimer) {
+			clearTimeout(reconnectTimer);
+			reconnectTimer = null;
+		}
+	}
+	
+	function scheduleReconnect() {
+		if (reconnectTimer) {
+			return;
+		}
+		const delay = getRetryDelay();
+		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+		reconnectTimer = setTimeout(function() {
+			reconnectTimer = null;
+			retryCount++;
+			connectWebSocket();
+		}, delay);
+	}
+	
+	function handleSocketMessage(event) {
+		if (!event.data) {
+			return;
+		}
+		let data;
+		try {
+			data = JSON.parse(event.data);
+		} catch (e) {
+			return;
+		}
 		if (data.ln) {
 		  // Update current language from socket unless translating
 		  if (!langTo) {
 			currentLanguage = data.ln;
 		  }
 		}
-		if (langTo && data.ln) {
-		  if (langFrom !== data.ln.split("-")[0]) {
-			langFrom = data.ln.split("-")[0];
-			loadModel();
-		  }
-		  translateCall(data.final || data.interm, data, data.interm||false);
+		
+		// Handle context for translation
+		if (langTo && useContext && data.final) {
+			// Store message in history
+			messageHistory.push(data.final);
+			if (messageHistory.length > contextSize + 1) {
+				messageHistory.shift(); // Keep only recent messages
+			}
+			
+			// Create context text
+			const contextText = messageHistory.join(' ');
+			
+			if (data.ln && langFrom !== data.ln.split("-")[0]) {
+				langFrom = data.ln.split("-")[0];
+				// Recalculate if translation is needed after language change
+				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+				if (needsTranslation && (!googleApiKey || forceLocal)) {
+					loadModel();
+				}
+			}
+			translateCall(contextText, data, data.interm||false);
+		} else if (langTo) {
+			// Original behavior without context
+			if (data.ln && langFrom !== data.ln.split("-")[0]) {
+				langFrom = data.ln.split("-")[0];
+				// Recalculate if translation is needed after language change
+				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+				if (needsTranslation && (!googleApiKey || forceLocal)) {
+					loadModel();
+				}
+			}
+			translateCall(data.final || data.interm, data, data.interm||false);
 		} else {
-		  processReply(data);
+			processReply(data);
 		}
-	  }
-	});
+	}
+
+	function connectWebSocket() {
+		if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+			return;
+		}
+
+		const ws = new WebSocket("wss://api.caption.ninja:443");
+		socket = ws;
+		ws.onmessage = function(event) {
+			if (socket !== ws) {
+				return;
+			}
+			handleSocketMessage(event);
+		};
+
+		ws.onclose = function() {
+			if (socket !== ws) {
+				return;
+			}
+			socket = null;
+			console.log("WebSocket connection closed. Attempting to reconnect...");
+			scheduleReconnect();
+		};
+
+		ws.onopen = function() {
+			if (socket !== ws) {
+				return;
+			}
+			console.log("WebSocket connected. Joining room...");
+			// Reset retry count on successful connection
+			retryCount = 0;
+			clearReconnectTimer();
+			ws.send(JSON.stringify({"join":roomID}));
+		};
+
+		ws.onerror = function(error) {
+			if (socket !== ws) {
+				return;
+			}
+			console.error("WebSocket error:", error);
+			if (ws.readyState !== WebSocket.CLOSED) {
+				ws.close();
+			}
+		};
+	}
+
+	connectWebSocket();
 	
-	var lastLabel = "";
+	window.addEventListener('beforeunload', function() {
+		clearReconnectTimer();
+		if (socket) {
+			socket.onclose = null;
+			try {
+				socket.close();
+			} catch (e) {}
+			socket = null;
+		}
+	});
+		
+		var lastLabel = "";
 	var label = ""
 	
 	var sanitize = function(string) {
@@ -735,11 +1149,25 @@
 		return decodedAndStrippedText.trim();
 	};
 	
+	function buildLineMarkup(text, originalText){
+		if (!text){
+			return "";
+		}
+		const displayText = sanitize(text);
+		if (dualOverlay && originalText){
+			const originalClean = sanitize(originalText);
+			if (originalClean && originalClean !== displayText){
+				return `${label}<span class="dual-line"><span class="dual-translation">${displayText}</span><span class="dual-original">${originalClean}</span></span><br/>`;
+			}
+		}
+		return `${label}<span>${displayText}</span><br/>`;
+	}
+	
 	
 	
 	function processReply(data){
 		var newLabel = false;
-		
+		 
 		if (data.label){
 			console.log(data.label);
 			try {
@@ -754,17 +1182,54 @@
 		}
 		// console.log(data);
 		if ("interm" in data){
-			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
+			const outputEl = document.getElementById("output");
+			const intermEl = document.getElementById("interm");
+
+			// Option 3: Apply interim-aware line truncation
+			let intermText = data.interm;
+			if (interimMaxLines && intermText) {
+				intermText = truncateToLines(intermText, interimMaxLines);
+			}
+
+			const intermMarkup = buildLineMarkup(intermText, data.originalInterm || data.originalFinal);
+
+			if (intermClear) {
+				outputEl.innerHTML = "";
+				enforceMaxLines();
+			}
+
+			intermEl.innerHTML = intermMarkup;
+			try { adjustIntermVisibility(); } catch(e){}
+			// Optional streaming TTS via tts.rocks when requested
+			try {
+				if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
+					window.CAPTION_TTS.speak(data.interm, true);
+				}
+			} catch(e){ console.warn(e); }
 		} else if ("final" in data){
-		
-			tts.speak(data.final);
-		
-			if (clearOnNew || data.c){
-				document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
-			} else {
-				document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
-			} 
-			document.getElementById("interm").innerHTML="";
+		 
+			// Decide between built-in overlay TTS and external tts.rocks
+			var provider = (urlParams.get('ttsprovider')||'').toLowerCase();
+			var forceExternal = (urlParams.get('ttslib')||'').toLowerCase() === 'rocks';
+			var externalPreferred = forceExternal || ['kokoro','piper','espeak','kitten','openai'].includes(provider);
+			try {
+				if (externalPreferred && window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+					window.CAPTION_TTS.speak(data.final);
+				} else {
+					// Fall back to built-in overlay TTS
+					tts.speak(data.final);
+				}
+			} catch(e){ console.warn(e); }
+		 
+				const finalMarkup = buildLineMarkup(data.final, data.originalFinal || data.originalInterm);
+				if (clearOnNew || data.c){
+					document.getElementById("output").innerHTML = finalMarkup;
+				} else {
+					document.getElementById("output").innerHTML += finalMarkup;
+				}
+				enforceMaxLines();
+				document.getElementById("interm").innerHTML="";
+				try { adjustIntermVisibility(); } catch(e){}
 		}
 		
 		if (!clearOnNew){
@@ -773,8 +1238,9 @@
 			}
 			if (timeoutSpeed){
 				idle = setTimeout(function(){
-					document.getElementById("output").innerHTML="";
-					document.getElementById("interm").innerHTML="";
+						document.getElementById("output").innerHTML="";
+						document.getElementById("interm").innerHTML="";
+						try { adjustIntermVisibility(); } catch(e){}
 				},timeoutSpeed);
 			}
 		}
@@ -783,7 +1249,17 @@
 	socket.onclose = function (){
 		setTimeout(function(){window.location.reload(true);},100);
 	};
-	
+
+	// Optional: open a separate TTS window powered by tts.rocks bridge
+	try {
+	  if (urlParams.has('ttspopout')) {
+	    var qs = new URLSearchParams(window.location.search);
+	    qs.set('room', roomID);
+	    var bridgeUrl = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '') + '/tts.rocks/caption-bridge.html?' + qs.toString();
+	    window.open(bridgeUrl, '_blank', 'noopener');
+	  }
+	} catch (e) { console.warn(e); }
+	 
 	</script>
 	</body>
 </html>

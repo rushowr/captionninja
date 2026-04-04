@@ -4,7 +4,8 @@
 	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
 	<meta content="utf-8" http-equiv="encoding" />
 	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
-	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+	<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+	<link rel="shortcut icon" href="favicon.svg" />
 	<!-- Primary Meta Tags -->
 	<title>CAPTION.Ninja</title>
 	<meta name="title" content="CAPTION.Ninja" />
@@ -77,7 +78,9 @@
 		<br /><br />
 	</div>
 	<div id="output" class="output"></div>
-	
+	<script src="tts-integration.js"></script>
+	<script src="ws-publisher.js"></script>
+	<script src="text-rules.js"></script>
 	<script>
 	
 	function updateURL(param, force=false) {
@@ -128,11 +131,11 @@
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
 	
-	
-	function generateStreamID(){
+	// Secure alphanumeric room ID generator (>=12 chars)
+	function generateSecureRoomID(len = 16) {
 		var text = "";
-		var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-		for (var i = 0; i < 7; i++){
+		var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+		for (var i = 0; i < len; i++){
 			text += possible.charAt(Math.floor(Math.random() * possible.length));
 		}
 		return text;
@@ -151,9 +154,17 @@
 	} else if (urlParams.has("ROOM")){
 		roomID = urlParams.get("ROOM");
 	} else {
-		roomID = generateStreamID();
-		updateURL("room="+roomID);
+		var storedRoom = "";
+		try { storedRoom = localStorage.getItem('cn_room_id') || ""; } catch (e) {}
+		if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) {
+			roomID = storedRoom;
+			updateURL("room="+roomID);
+		} else {
+			roomID = generateSecureRoomID(16);
+			updateURL("room="+roomID);
+		}
 	}
+	try { localStorage.setItem('cn_room_id', roomID); } catch (e) {}
 	
 	
 	var counter=0;
@@ -169,27 +180,41 @@
     }); 
 
 	var apiKey = false;
+	var wsPublisher = null;
+	var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+		? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+		: { replacements: [], restricted: [], matchMode: 'phonetic' };
+	var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+		? window.CaptionTextRules.createEngine(textRulesConfig)
+		: null;
 
-	var socket;
+	function applyTextRules(text) {
+		if (!textRulesEngine || typeof text !== "string") return text;
+		try {
+			return textRulesEngine.apply(text);
+		} catch (e) {
+			console.warn("Text rules failed:", e);
+			return text;
+		}
+	}
 
 	function connectWebSocket() {
-	  socket = new WebSocket("wss://api.caption.ninja:443");
-
-	  socket.onclose = function() {
-		console.log("WebSocket connection closed. Attempting to reconnect...");
-		setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
-	  };
-
-	  socket.onopen = function() {
-		console.log("WebSocket connected. Joining room...");
-		socket.send(JSON.stringify({"join":roomID}));
-	  };
-
-	  // Add error handling
-	  socket.onerror = function(error) {
-		console.error("WebSocket error:", error);
-		setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
-	  };
+		wsPublisher = createWSPublisher({
+			url: "wss://api.caption.ninja:443",
+			room: roomID,
+			onStateChange: function(nextState, snapshot) {
+				if (nextState === "error") {
+					console.error("WebSocket error state:", snapshot && snapshot.lastError);
+				}
+				if (snapshot && snapshot.blockedSuspected) {
+					console.warn("WebSocket may be blocked by network or firewall.");
+				}
+			},
+			onError: function(error) {
+				console.error("WebSocket error:", error);
+			}
+		});
+		wsPublisher.connect();
 	}
 
 	// Initial connection
@@ -197,29 +222,35 @@
 	
 	function interResults(){
 		counter+=1;
-		var interim_transcript = document.getElementById("userinput").value;
-		document.getElementById("interm").innerHTML = interim_transcript;
-		try {
-			socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label}));
-		} catch(e){
-			interim_transcript="";
+		var interim_transcript = applyTextRules(document.getElementById("userinput").value);
+		document.getElementById("interm").textContent = interim_transcript;
+		if (wsPublisher) {
+			wsPublisher.publish({"msg":true, "interm":interim_transcript, "id":counter, "label":label});
 		}
+		try {
+			if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
+				window.CAPTION_TTS.speak(interim_transcript, true);
+			}
+		} catch (e) { console.warn(e); }
 	}
 		
 	function finalResults(){
 		counter+=1;
-		var final_transcript = document.getElementById("userinput").value;
-		try {
+		var final_transcript = applyTextRules(document.getElementById("userinput").value);
+		if (wsPublisher) {
 			if (final_transcript==""){
-				socket.send(JSON.stringify({"msg":true, "final":"", "id":counter, "label":label}));
+				wsPublisher.publish({"msg":true, "final":"", "id":counter, "label":label});
 			} else {
-				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label}));
+				wsPublisher.publish({"msg":true, "final":final_transcript, "id":counter, "label":label});
 			}
-		} catch(e){
-			final_transcript="";
 		}
-		document.getElementById("output").innerHTML+=final_transcript;
-		document.getElementById("interm").innerHTML="";
+		try {
+			if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+				window.CAPTION_TTS.speak(final_transcript);
+			}
+		} catch (e) { console.warn(e); }
+		document.getElementById("output").appendChild(document.createTextNode(final_transcript));
+		document.getElementById("interm").textContent="";
 		document.getElementById("userinput").value = "";
 	}
 				
@@ -230,6 +261,32 @@
 			interResults();
 		}
 	});
+
+	window.copyWsDebugInfo = function () {
+		if (!wsPublisher) return;
+		var snapshot = wsPublisher.getSnapshot();
+		var text = "[Caption.Ninja WS Debug]\\n" +
+			"room=" + roomID + "\\n" +
+			"state=" + snapshot.state + "\\n" +
+			"retries=" + snapshot.retryCount + "\\n" +
+			"queue=" + snapshot.queueLength + "\\n" +
+			"dropped=" + snapshot.droppedCount + "\\n" +
+			"blocked=" + snapshot.blockedSuspected + "\\n" +
+			"lastError=" + (snapshot.lastError || "") + "\\n" +
+			"userAgent=" + navigator.userAgent;
+		navigator.clipboard.writeText(text).catch(function(){});
+	};
+
+	// Optional: open a separate TTS window powered by tts.rocks bridge
+	try {
+	  if (urlParams.has('ttspopout')) {
+	    var qs = new URLSearchParams(window.location.search);
+	    qs.set('room', roomID);
+	    var base = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '');
+	    var bridgeUrl = base + '/tts.rocks/caption-bridge.html?' + qs.toString();
+	    window.open(bridgeUrl, '_blank', 'noopener');
+	  }
+	} catch (e) { console.warn(e); }
 	
 	</script>
 	</body>
